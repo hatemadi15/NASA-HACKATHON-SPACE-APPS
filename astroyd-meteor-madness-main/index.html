@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    html, body, #cesiumContainer { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    #toggleButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      padding: 10px 20px;
+      background: rgba(42, 42, 42, 0.8);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      display: none;
+      font-size: 14px;
+    }
+    #toggleButton:hover {
+      background: rgba(62, 62, 62, 0.8);
+    }
+    #launchButton {
+      position: absolute;
+      top: 10px;
+      left: 150px;
+      z-index: 1000;
+      padding: 10px 20px;
+      background: rgba(255, 69, 0, 0.8);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #launchButton:hover {
+      background: rgba(255, 99, 71, 0.8);
+    }
+    #cameraToggleButton {
+      position: absolute;
+      top: 10px;
+      left: 300px;
+      z-index: 1000;
+      padding: 10px 20px;
+      background: rgba(0, 123, 255, 0.8);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #cameraToggleButton:hover {
+      background: rgba(0, 153, 255, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div style="position:absolute;top:10px;right:10px;z-index:2000;background:rgba(255,255,255,0.95);padding:18px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);max-width:320px;">
+    <div id="status" style="margin-bottom:10px;font-weight:bold;font-size:12px;">Connecting...</div>
+    <form id="impactForm">
+      <h3 style="margin-top:0">Asteroid Impact Settings</h3>
+  <label for="latitude">Latitude:</label>
+  <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
+  <label for="longitude">Longitude:</label>
+  <input type="number" id="longitude" name="longitude" step="0.01" value="35.5018" style="width:80px;margin-bottom:8px"><br>
+  <label for="elevation">Elevation (m):</label>
+  <input type="number" id="elevation" name="elevation" step="1" value="0" style="width:80px;margin-bottom:8px"><br>
+  <hr style="margin:12px 0">
+  <label for="launch_latitude">Launch Latitude:</label>
+  <input type="number" id="launch_latitude" name="launch_latitude" step="0.01" value="28.0" style="width:80px;margin-bottom:8px"><br>
+  <label for="launch_longitude">Launch Longitude:</label>
+  <input type="number" id="launch_longitude" name="launch_longitude" step="0.01" value="5.0" style="width:80px;margin-bottom:8px"><br>
+  <label for="launch_altitude">Launch Altitude (m):</label>
+  <input type="number" id="launch_altitude" name="launch_altitude" step="1" value="100000" style="width:80px;margin-bottom:8px"><br>
+  <label for="asteroid_size">Asteroid Size (m):</label>
+  <input type="number" id="asteroid_size" name="asteroid_size" step="1" value="50" style="width:80px;margin-bottom:8px"><br>
+  <label for="asteroid_speed">Asteroid Speed (m/s):</label>
+  <input type="number" id="asteroid_speed" name="asteroid_speed" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+  <label for="asteroid_mass">Asteroid Mass (kg):</label>
+  <input type="number" id="asteroid_mass" name="asteroid_mass" step="1" value="1000000" style="width:80px;margin-bottom:8px"><br>
+  <label for="asteroid_density">Asteroid Density (kg/m³):</label>
+  <input type="number" id="asteroid_density" name="asteroid_density" step="1" value="3000" style="width:80px;margin-bottom:8px"><br>
+      <label for="crater_diameter">Crater Diameter (m):</label>
+      <input type="number" id="crater_diameter" name="crater_diameter" step="1" value="1200" style="width:80px;margin-bottom:8px"><br>
+      <label for="blast_radius">Blast Radius (m):</label>
+      <input type="number" id="blast_radius" name="blast_radius" step="1" value="50000" style="width:80px;margin-bottom:8px"><br>
+      <label for="thermal_radius">Thermal Radius (m):</label>
+      <input type="number" id="thermal_radius" name="thermal_radius" step="1" value="80000" style="width:80px;margin-bottom:8px"><br>
+      <label for="fireball_radius">Fireball Radius (m):</label>
+      <input type="number" id="fireball_radius" name="fireball_radius" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+      <label for="evacuation_radius">Evacuation Radius (m):</label>
+      <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px"><br>
+  <button type="submit" style="margin-top:10px;padding:8px 18px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer">Launch</button>
+    </form>
+  </div>
+  <div id="cesiumContainer"></div>
+  <button id="toggleButton">Toggle View</button>
+  <!-- Launch button removed, now handled by form submit -->
+  <button id="cameraToggleButton">Follow Asteroid</button>
+  <script type="module">
+    import { setupCesiumVisualization } from './cesium-visualization.js';
+    import { MeteorMadnessAPI } from './api-client.js';
+    
+    // Store user input and pass to Cesium visualization
+    let userImpactSettings = {
+      latitude: 30.0,
+      longitude: 10.0,
+      elevation: 0.0,
+      crater_diameter: 1200,
+      blast_radius: 50000,
+      thermal_radius: 80000,
+      fireball_radius: 20000,
+      evacuation_radius: 100000
+    };
+
+    // Initialize API client
+    const api = new MeteorMadnessAPI();
+
+    // Check backend connection on page load
+    async function checkBackendConnection() {
+      try {
+        const version = await api.getVersion();
+        console.log('Backend connected:', version);
+        document.getElementById('status').textContent = `Backend Connected (v${version.version})`;
+        document.getElementById('status').style.color = 'green';
+      } catch (error) {
+        console.error('Backend connection failed:', error);
+        document.getElementById('status').textContent = 'Backend Disconnected';
+        document.getElementById('status').style.color = 'red';
+      }
+    }
+
+    document.getElementById('impactForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      // Show loading state
+      const submitButton = e.target.querySelector('button[type="submit"]');
+      const originalText = submitButton.textContent;
+      submitButton.textContent = 'Simulating...';
+      submitButton.disabled = true;
+
+      try {
+        // Collect form data
+        const formData = {
+          latitude: parseFloat(document.getElementById('latitude').value),
+          longitude: parseFloat(document.getElementById('longitude').value),
+          elevation: parseFloat(document.getElementById('elevation').value),
+          crater_diameter: parseFloat(document.getElementById('crater_diameter').value),
+          blast_radius: parseFloat(document.getElementById('blast_radius').value),
+          thermal_radius: parseFloat(document.getElementById('thermal_radius').value),
+          fireball_radius: parseFloat(document.getElementById('fireball_radius').value),
+          evacuation_radius: parseFloat(document.getElementById('evacuation_radius').value),
+          asteroid_size: parseFloat(document.getElementById('asteroid_size').value),
+          asteroid_speed: parseFloat(document.getElementById('asteroid_speed').value),
+          asteroid_mass: parseFloat(document.getElementById('asteroid_mass').value),
+          asteroid_density: parseFloat(document.getElementById('asteroid_density').value),
+          launch_latitude: parseFloat(document.getElementById('launch_latitude').value),
+          launch_longitude: parseFloat(document.getElementById('launch_longitude').value),
+          launch_altitude: parseFloat(document.getElementById('launch_altitude').value)
+        };
+
+        // Call backend simulation API
+        const simulationResult = await api.simulateImpact(
+          {
+            diameter: formData.asteroid_size,
+            mass: formData.asteroid_mass,
+            velocity: formData.asteroid_speed,
+            density: formData.asteroid_density
+          },
+          {
+            latitude: formData.latitude,
+            longitude: formData.longitude,
+            elevation: formData.elevation
+          },
+          {
+            useNasaData: true,
+            useML: true
+          }
+        );
+
+        console.log('Simulation result:', simulationResult);
+
+        // Update user settings with backend results
+        userImpactSettings = {
+          ...formData,
+          // Use backend calculated values if available
+          crater_diameter: simulationResult.impact_result?.crater_diameter || formData.crater_diameter,
+          blast_radius: simulationResult.impact_result?.blast_radius || formData.blast_radius,
+          thermal_radius: simulationResult.impact_result?.thermal_radius || formData.thermal_radius,
+          fireball_radius: simulationResult.impact_result?.fireball_radius || formData.fireball_radius,
+          evacuation_radius: simulationResult.impact_result?.evacuation_radius || formData.evacuation_radius
+        };
+
+        // Update form with backend results
+        if (simulationResult.impact_result) {
+          document.getElementById('crater_diameter').value = simulationResult.impact_result.crater_diameter;
+          document.getElementById('blast_radius').value = simulationResult.impact_result.blast_radius;
+          document.getElementById('thermal_radius').value = simulationResult.impact_result.thermal_radius;
+          document.getElementById('fireball_radius').value = simulationResult.impact_result.fireball_radius;
+          document.getElementById('evacuation_radius').value = simulationResult.impact_result.evacuation_radius;
+        }
+
+        // Trigger visualization update
+        window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: userImpactSettings }));
+
+        // Show success message
+        document.getElementById('status').textContent = 'Simulation Complete!';
+        document.getElementById('status').style.color = 'green';
+
+      } catch (error) {
+        console.error('Simulation failed:', error);
+        document.getElementById('status').textContent = 'Simulation Failed';
+        document.getElementById('status').style.color = 'red';
+        
+        // Fallback to local simulation
+        userImpactSettings = {
+          latitude: parseFloat(document.getElementById('latitude').value),
+          longitude: parseFloat(document.getElementById('longitude').value),
+          elevation: parseFloat(document.getElementById('elevation').value),
+          crater_diameter: parseFloat(document.getElementById('crater_diameter').value),
+          blast_radius: parseFloat(document.getElementById('blast_radius').value),
+          thermal_radius: parseFloat(document.getElementById('thermal_radius').value),
+          fireball_radius: parseFloat(document.getElementById('fireball_radius').value),
+          evacuation_radius: parseFloat(document.getElementById('evacuation_radius').value),
+          asteroid_size: parseFloat(document.getElementById('asteroid_size').value),
+          asteroid_speed: parseFloat(document.getElementById('asteroid_speed').value),
+          asteroid_mass: parseFloat(document.getElementById('asteroid_mass').value),
+          asteroid_density: parseFloat(document.getElementById('asteroid_density').value),
+          launch_latitude: parseFloat(document.getElementById('launch_latitude').value),
+          launch_longitude: parseFloat(document.getElementById('launch_longitude').value),
+          launch_altitude: parseFloat(document.getElementById('launch_altitude').value)
+        };
+        window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: userImpactSettings }));
+      } finally {
+        // Reset button state
+        submitButton.textContent = originalText;
+        submitButton.disabled = false;
+      }
+    });
+
+    window.getImpactSettings = () => userImpactSettings;
+    
+    // Initialize
+    checkBackendConnection();
+    setupCesiumVisualization('cesiumContainer');
+  </script>
+</body>
+</html>
