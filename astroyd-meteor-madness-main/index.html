@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    html, body, #cesiumContainer { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    #toggleButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      padding: 10px 20px;
+      background: rgba(42, 42, 42, 0.8);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      display: none;
+      font-size: 14px;
+    }
+    #toggleButton:hover {
+      background: rgba(62, 62, 62, 0.8);
+    }
+    #launchButton {
+      position: absolute;
+      top: 10px;
+      left: 150px;
+      z-index: 1000;
+      padding: 10px 20px;
+      background: rgba(255, 69, 0, 0.8);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #launchButton:hover {
+      background: rgba(255, 99, 71, 0.8);
+    }
+    #cameraToggleButton {
+      position: absolute;
+      top: 10px;
+      left: 300px;
+      z-index: 1000;
+      padding: 10px 20px;
+      background: rgba(0, 123, 255, 0.8);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #cameraToggleButton:hover {
+      background: rgba(0, 153, 255, 0.8);
+    }
+    #authButton {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 2001;
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    #historyButton {
+        position: absolute;
+        top: 10px;
+        right: 120px;
+        z-index: 2001;
+        padding: 10px 20px;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        display: none; /* Hidden by default */
+    }
+    #authModal, #historyModal {
+        display: none;
+        position: fixed;
+        z-index: 3000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: 10% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+        max-width: 900px;
+        border-radius: 8px;
+    }
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    .close:hover,
+    .close:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    #loginForm, #registerForm {
+        display: flex;
+        flex-direction: column;
+    }
+    input {
+        margin-bottom: 10px;
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+    }
+    button {
+        padding: 10px;
+        border-radius: 4px;
+        border: none;
+        color: white;
+        cursor: pointer;
+    }
+    #loginButton, #registerButton {
+        background-color: #007bff;
+    }
+    #logoutButton {
+        background-color: #dc3545;
+        display: none;
+    }
+    #historyTable {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+    }
+    #historyTable th, #historyTable td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    #historyTable th {
+        background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <div id="authButton">Login/Register</div>
+  <div id="logoutButton">Logout</div>
+  <div id="historyButton">History</div>
+
+  <div id="authModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div id="loginContainer">
+        <h2>Login</h2>
+        <form id="loginForm">
+          <input type="text" id="loginUsername" placeholder="Username" required>
+          <input type="password" id="loginPassword" placeholder="Password" required>
+          <button type="submit" id="loginButton">Login</button>
+        </form>
+        <p>Don't have an account? <a href="#" id="showRegister">Register here</a></p>
+      </div>
+      <div id="registerContainer" style="display:none;">
+        <h2>Register</h2>
+        <form id="registerForm">
+          <input type="text" id="registerUsername" placeholder="Username" required>
+          <input type="email" id="registerEmail" placeholder="Email" required>
+          <input type="password" id="registerPassword" placeholder="Password" required>
+          <input type="text" id="registerFullName" placeholder="Full Name">
+          <button type="submit" id="registerButton">Register</button>
+        </form>
+        <p>Already have an account? <a href="#" id="showLogin">Login here</a></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="historyModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Simulation History</h2>
+      <div style="max-height: 60vh; overflow-y: auto;">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Asteroid Size (m)</th>
+              <th>Asteroid Speed (m/s)</th>
+              <th>Impact Angle</th>
+              <th>Blast Radius (km)</th>
+              <th>Crater Diameter (km)</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <!-- History rows will be inserted here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute;top:10px;right:10px;z-index:2000;background:rgba(255,255,255,0.95);padding:18px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);max-width:320px;">
+    <div id="status" style="margin-bottom:10px;font-weight:bold;font-size:12px;">Connecting...</div>
+    <div id="userInfo" style="display:none;">
+        <p>Welcome, <span id="username"></span></p>
+    </div>
+    <form id="impactForm">
+      <h3 style="margin-top:0">Asteroid Impact Settings</h3>
+      <label for="latitude">Latitude:</label>
+      <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
+      <label for="longitude">Longitude:</label>
+      <input type="number" id="longitude" name="longitude" step="0.01" value="35.5018" style="width:80px;margin-bottom:8px"><br>
+      <label for="elevation">Elevation (m):</label>
+      <input type="number" id="elevation" name="elevation" step="1" value="0" style="width:80px;margin-bottom:8px"><br>
+      <label for="terrain_type">Terrain Type:</label>
+      <select id="terrain_type" name="terrain_type" style="width:90px;margin-bottom:8px">
+        <option value="ocean">Ocean</option>
+        <option value="land" selected>Land</option>
+        <option value="urban">Urban</option>
+        <option value="rural">Rural</option>
+        <option value="mountain">Mountain</option>
+        <option value="desert">Desert</option>
+        <option value="forest">Forest</option>
+        <option value="ice">Ice</option>
+      </select><br>
+      <hr style="margin:12px 0">
+      <label for="asteroid_size">Asteroid Size (m):</label>
+      <input type="number" id="asteroid_size" name="asteroid_size" step="1" value="50" style="width:80px;margin-bottom:8px"><br>
+      <label for="asteroid_speed">Asteroid Speed (m/s):</label>
+      <input type="number" id="asteroid_speed" name="asteroid_speed" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+      <label for="asteroid_mass">Asteroid Mass (kg):</label>
+      <input type="number" id="asteroid_mass" name="asteroid_mass" step="1" value="1000000" style="width:80px;margin-bottom:8px"><br>
+      <label for="asteroid_density">Asteroid Density (kg/m³):</label>
+      <input type="number" id="asteroid_density" name="asteroid_density" step="1" value="3000" style="width:80px;margin-bottom:8px"><br>
+      <label for="impact_angle">Impact Angle:</label>
+      <input type="number" id="impact_angle" name="impact_angle" step="1" value="45" style="width:80px;margin-bottom:8px"><br>
+      <label for="composition">Composition:</label>
+      <select id="composition" name="composition" style="width:90px;margin-bottom:8px">
+        <option value="iron">Iron</option>
+        <option value="stony" selected>Stony</option>
+        <option value="carbonaceous">Carbonaceous</option>
+        <option value="mixed">Mixed</option>
+      </select><br>
+      <hr style="margin:12px 0">
+      <label for="crater_diameter">Crater Diameter (m):</label>
+      <input type="number" id="crater_diameter" name="crater_diameter" step="1" value="1200" style="width:80px;margin-bottom:8px"><br>
+      <label for="blast_radius">Blast Radius (m):</label>
+      <input type="number" id="blast_radius" name="blast_radius" step="1" value="50000" style="width:80px;margin-bottom:8px"><br>
+      <label for="thermal_radius">Thermal Radius (m):</label>
+      <input type="number" id="thermal_radius" name="thermal_radius" step="1" value="80000" style="width:80px;margin-bottom:8px"><br>
+      <label for="fireball_radius">Fireball Radius (m):</label>
+      <input type="number" id="fireball_radius" name="fireball_radius" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+      <label for="evacuation_radius">Evacuation Radius (m):</label>
+      <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px"><br>
+    </form>
+  </div>
+  <div id="cesiumContainer"></div>
+  <button id="toggleButton">Toggle View</button>
+  <button id="cameraToggleButton">Follow Asteroid</button>
+  <button id="launchButton" type="button">Launch Simulation</button>
+  <script type="module">
+    import { setupCesiumVisualization } from './cesium-visualization.js';
+    import { MeteorMadnessAPI } from './api-client.js';
+    
+    const clone = (value) => {
+      if (typeof structuredClone === 'function') {
+        return structuredClone(value);
+      }
+      return JSON.parse(JSON.stringify(value));
+    };
+
+    const DEFAULT_SIMULATION = {
+      location: {
+        latitude: 33.8938,
+        longitude: 35.5018,
+        elevation: 0.0,
+        terrain_type: 'land',
+        population_density: 0,
+        blast_radius: 50000,
+        crater_diameter: 1200,
+        thermal_radius: 80000,
+        fireball_radius: 20000,
+        evacuation_radius: 100000,
+        launch_longitude: null,
+        launch_latitude: null,
+        launch_altitude: null
+      },
+      asteroid: {
+        diameter: 50,
+        mass: 1000000,
+        velocity: 20000,
+        density: 3000,
+        impact_angle: 45,
+        composition: 'stony'
+      },
+      impactResult: {
+        crater_diameter: 1200,
+        crater_depth: 240,
+        crater_volume: 0,
+        blast_radius: 50000,
+        thermal_radius: 80000,
+        fireball_radius: 20000,
+        seismic_magnitude: 0,
+        tsunami_height: 0,
+        atmospheric_effects: {},
+        impact_zones: [],
+        evacuation_radius: 100000,
+        affected_area: 0
+      },
+      metadata: null,
+      simulationId: null
+    };
+
+    let latestSimulation = clone(DEFAULT_SIMULATION);
+
+    const api = new MeteorMadnessAPI();
+    let cachedHistory = [];
+
+    const renderHistoryTable = (history) => {
+      const tableBody = document.getElementById('historyTableBody');
+      if (!tableBody) {
+        return;
+      }
+      tableBody.innerHTML = '';
+      if (!history || history.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6">No history found.</td></tr>';
+        return;
+      }
+
+      history.forEach((sim) => {
+        const row = document.createElement('tr');
+        const timestampValue = sim.simulation_metadata?.timestamp;
+        const timestamp = timestampValue ? new Date(timestampValue).toLocaleString() : 'Unknown';
+        const asteroid = sim.asteroid || {};
+        const impactResult = sim.impact_result || {};
+        const blastRadiusKm = typeof impactResult.blast_radius === 'number' ? (impactResult.blast_radius / 1000).toFixed(2) : '--';
+        const craterDiameterKm = typeof impactResult.crater_diameter === 'number' ? (impactResult.crater_diameter / 1000).toFixed(2) : '--';
+
+        row.innerHTML = `
+                    <td>${timestamp}</td>
+                    <td>${asteroid.diameter ?? '--'}</td>
+                    <td>${asteroid.velocity ?? '--'}</td>
+                    <td>${asteroid.impact_angle ?? '--'}</td>
+                    <td>${blastRadiusKm}</td>
+                    <td>${craterDiameterKm}</td>
+                `;
+        tableBody.appendChild(row);
+      });
+    };
+
+    const loadHistory = async ({ force = false } = {}) => {
+      if (!api.token) {
+        cachedHistory = [];
+        throw new Error('Not authenticated');
+      }
+      if (!force && cachedHistory.length) {
+        return cachedHistory;
+      }
+      const history = await api.getSimulationHistory();
+      cachedHistory = history;
+      return history;
+    };
+
+    async function checkBackendConnection() {
+      try {
+        const version = await api.getVersion();
+        console.log('Backend connected:', version);
+        document.getElementById('status').textContent = `Backend Connected (v${version.version})`;
+        document.getElementById('status').style.color = 'green';
+      } catch (error) {
+        console.error('Backend connection failed:', error);
+        document.getElementById('status').textContent = 'Backend Disconnected';
+        document.getElementById('status').style.color = 'red';
+      }
+    }
+
+    document.getElementById('launchButton').addEventListener('click', async function(e) {
+      e.preventDefault();
+      
+      const launchButton = document.getElementById('launchButton');
+      const originalText = launchButton.textContent;
+      launchButton.textContent = 'Simulating...';
+      launchButton.disabled = true;
+
+      try {
+        const asteroidData = {
+          diameter: parseFloat(document.getElementById('asteroid_size').value),
+          mass: parseFloat(document.getElementById('asteroid_mass').value),
+          velocity: parseFloat(document.getElementById('asteroid_speed').value),
+          density: parseFloat(document.getElementById('asteroid_density').value),
+          impact_angle: parseFloat(document.getElementById('impact_angle').value),
+          composition: document.getElementById('composition').value
+        };
+
+        const impactLocation = {
+          latitude: parseFloat(document.getElementById('latitude').value),
+          longitude: parseFloat(document.getElementById('longitude').value),
+          elevation: parseFloat(document.getElementById('elevation').value),
+          terrain_type: document.getElementById('terrain_type').value
+        };
+
+        const simulationResult = await api.simulateImpact(asteroidData, impactLocation);
+
+        console.log('Simulation result:', simulationResult);
+
+        const impactResult = simulationResult.impact_result || {};
+        const asteroidFromResponse = simulationResult.asteroid || {};
+
+        latestSimulation = {
+          location: {
+            latitude: impactLocation.latitude,
+            longitude: impactLocation.longitude,
+            elevation: impactLocation.elevation,
+            terrain_type: impactLocation.terrain_type,
+            population_density: simulationResult.impact_location?.population_density ?? impactLocation.population_density ?? 0,
+            blast_radius: impactResult.blast_radius ?? DEFAULT_SIMULATION.location.blast_radius,
+            crater_diameter: impactResult.crater_diameter ?? DEFAULT_SIMULATION.location.crater_diameter,
+            thermal_radius: impactResult.thermal_radius ?? DEFAULT_SIMULATION.location.thermal_radius,
+            fireball_radius: impactResult.fireball_radius ?? DEFAULT_SIMULATION.location.fireball_radius,
+            evacuation_radius: impactResult.evacuation_radius ?? DEFAULT_SIMULATION.location.evacuation_radius,
+            launch_longitude: impactLocation.launch_longitude ?? null,
+            launch_latitude: impactLocation.launch_latitude ?? null,
+            launch_altitude: impactLocation.launch_altitude ?? null
+          },
+          asteroid: {
+            diameter: asteroidFromResponse.diameter ?? asteroidData.diameter,
+            mass: asteroidFromResponse.mass ?? asteroidData.mass,
+            velocity: asteroidFromResponse.velocity ?? asteroidData.velocity,
+            density: asteroidFromResponse.density ?? asteroidData.density,
+            impact_angle: asteroidFromResponse.impact_angle ?? asteroidData.impact_angle,
+            composition: asteroidFromResponse.composition ?? asteroidData.composition
+          },
+          impactResult: {
+            ...DEFAULT_SIMULATION.impactResult,
+            ...impactResult,
+            impact_zones: Array.isArray(impactResult.impact_zones) ? impactResult.impact_zones : DEFAULT_SIMULATION.impactResult.impact_zones,
+            atmospheric_effects: impactResult.atmospheric_effects ?? DEFAULT_SIMULATION.impactResult.atmospheric_effects
+          },
+          metadata: simulationResult.simulation_metadata ?? null,
+          simulationId: simulationResult.simulation_id ?? null
+        };
+
+        const latestImpactResult = latestSimulation.impactResult || {};
+
+        if (typeof latestImpactResult.crater_diameter === 'number') {
+          document.getElementById('crater_diameter').value = latestImpactResult.crater_diameter;
+        }
+        if (typeof latestImpactResult.blast_radius === 'number') {
+          document.getElementById('blast_radius').value = latestImpactResult.blast_radius;
+        }
+        if (typeof latestImpactResult.thermal_radius === 'number') {
+          document.getElementById('thermal_radius').value = latestImpactResult.thermal_radius;
+        }
+        if (typeof latestImpactResult.fireball_radius === 'number') {
+          document.getElementById('fireball_radius').value = latestImpactResult.fireball_radius;
+        }
+        if (typeof latestImpactResult.evacuation_radius === 'number') {
+          document.getElementById('evacuation_radius').value = latestImpactResult.evacuation_radius;
+        }
+
+        window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: clone(latestSimulation) }));
+
+        if (typeof window.startMeteorSimulation === 'function') {
+          window.startMeteorSimulation();
+        }
+
+        if (api.token) {
+          loadHistory({ force: true })
+            .then(renderHistoryTable)
+            .catch((err) => console.warn('Failed to refresh history list', err));
+        }
+
+        document.getElementById('status').textContent = 'Simulation Complete!';
+        document.getElementById('status').style.color = 'green';
+
+      } catch (error) {
+        console.error('Simulation failed:', error);
+        document.getElementById('status').textContent = 'Simulation Failed';
+        document.getElementById('status').style.color = 'red';
+      } finally {
+        launchButton.textContent = originalText;
+        launchButton.disabled = false;
+      }
+    });
+
+    window.getImpactSettings = () => clone(latestSimulation);
+
+    // Prevent form submission on Enter key press to avoid page reload
+    // document.getElementById('impactForm').addEventListener('submit', function(e) {
+    //     e.preventDefault();
+    // });
+
+    // Prevent Enter key from submitting the form in input fields
+    // document.getElementById('impactForm').addEventListener('keydown', function(e) {
+    //     if (e.key === 'Enter') {
+    //         e.preventDefault();
+    //     }
+    // });
+
+    checkBackendConnection();
+    setupCesiumVisualization('cesiumContainer');
+
+    const authModal = document.getElementById('authModal');
+    const authButton = document.getElementById('authButton');
+    const closeButton = document.querySelector('.modal-content .close');
+    const showRegister = document.getElementById('showRegister');
+    const showLogin = document.getElementById('showLogin');
+    const loginContainer = document.getElementById('loginContainer');
+    const registerContainer = document.getElementById('registerContainer');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const logoutButton = document.getElementById('logoutButton');
+    const userInfo = document.getElementById('userInfo');
+    const usernameSpan = document.getElementById('username');
+    const historyButton = document.getElementById('historyButton');
+    const historyModal = document.getElementById('historyModal');
+    const historyCloseButton = historyModal.querySelector('.close');
+
+    authButton.onclick = () => { authModal.style.display = 'block'; };
+    closeButton.onclick = () => { authModal.style.display = 'none'; };
+    window.onclick = (event) => {
+        if (event.target == authModal || event.target == historyModal) {
+            authModal.style.display = 'none';
+            historyModal.style.display = 'none';
+        }
+    };
+
+    historyButton.onclick = async () => {
+        try {
+            const history = await loadHistory({ force: true });
+            renderHistoryTable(history);
+            historyModal.style.display = 'block';
+        } catch (error) {
+            console.error('Failed to fetch simulation history:', error);
+            alert('Could not load simulation history. Are you logged in?');
+        }
+    };
+
+    historyCloseButton.onclick = () => { historyModal.style.display = 'none'; };
+
+    showRegister.onclick = (e) => {
+        e.preventDefault();
+        loginContainer.style.display = 'none';
+        registerContainer.style.display = 'block';
+    };
+
+    showLogin.onclick = (e) => {
+        e.preventDefault();
+        registerContainer.style.display = 'none';
+        loginContainer.style.display = 'block';
+    };
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('loginUsername').value;
+        const password = document.getElementById('loginPassword').value;
+        try {
+            const data = await api.login(username, password);
+            localStorage.setItem('token', data.access_token);
+            api.setToken(data.access_token);
+            authModal.style.display = 'none';
+            authButton.style.display = 'none';
+            logoutButton.style.display = 'block';
+            historyButton.style.display = 'block';
+            const user = await api.getMe();
+            userInfo.style.display = 'block';
+            usernameSpan.textContent = user.username;
+        } catch (error) {
+            console.error('Login failed:', error);
+            alert('Login failed. Please check your credentials.');
+        }
+    });
+
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('registerUsername').value;
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        const fullName = document.getElementById('registerFullName').value;
+        try {
+            await api.register(username, email, password, fullName);
+            alert('Registration successful! Please login.');
+            showLogin.click();
+        } catch (error) {
+            console.error('Registration failed:', error);
+            alert('Registration failed. Please try again.');
+        }
+    });
+
+    logoutButton.onclick = async () => {
+        try {
+            await api.logout();
+        } catch (error) {
+            console.error('Logout failed on server:', error);
+        }
+        localStorage.removeItem('token');
+        api.setToken(null);
+        authButton.style.display = 'block';
+        logoutButton.style.display = 'none';
+        historyButton.style.display = 'none';
+        userInfo.style.display = 'none';
+        cachedHistory = [];
+        renderHistoryTable([]);
+    };
+
+    const token = localStorage.getItem('token');
+    if (token) {
+        api.setToken(token);
+        authButton.style.display = 'none';
+        logoutButton.style.display = 'block';
+        historyButton.style.display = 'block';
+        api.getMe().then(user => {
+            userInfo.style.display = 'block';
+            usernameSpan.textContent = user.username;
+            loadHistory({ force: true })
+                .then(renderHistoryTable)
+                .catch((err) => console.warn('Failed to preload history', err));
+        }).catch(() => {
+            localStorage.removeItem('token');
+            api.setToken(null);
+            authButton.style.display = 'block';
+            logoutButton.style.display = 'none';
+            historyButton.style.display = 'none';
+            userInfo.style.display = 'none';
+        });
+    }
+  </script>
+</body>
+</html>
