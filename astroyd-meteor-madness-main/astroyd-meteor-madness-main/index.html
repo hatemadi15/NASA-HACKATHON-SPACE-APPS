@@ -55,12 +55,132 @@
     #cameraToggleButton:hover {
       background: rgba(0, 153, 255, 0.8);
     }
+
+    #controlPanel {
+      position:absolute;
+      top:10px;
+      right:10px;
+      z-index:2000;
+      background:rgba(255,255,255,0.95);
+      padding:18px 24px;
+      border-radius:8px;
+      box-shadow:0 2px 12px rgba(0,0,0,0.12);
+      max-width:340px;
+      font-family: "Segoe UI", sans-serif;
+    }
+
+    .panel-section {
+      margin-bottom:14px;
+    }
+
+    .small-text {
+      font-size:11px;
+      color:#4a4a4a;
+    }
+
+    #authPanel form {
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      margin-bottom:8px;
+      font-size:12px;
+    }
+
+    #authPanel input {
+      padding:6px 8px;
+      border:1px solid #ccc;
+      border-radius:4px;
+      box-sizing:border-box;
+      font-size:12px;
+    }
+
+    #authPanel button {
+      padding:6px 10px;
+      border:none;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:12px;
+    }
+
+    #loginForm button {
+      background:#28a745;
+      color:#fff;
+    }
+
+    #registerForm button {
+      background:#17a2b8;
+      color:#fff;
+    }
+
+    #logoutButton {
+      background:#6c757d;
+      color:#fff;
+      display:none;
+    }
+
+    #registerDetails {
+      margin-bottom:8px;
+    }
+
+    #registerDetails summary {
+      cursor:pointer;
+      font-weight:600;
+      margin-bottom:6px;
+    }
+
+    #historyPanel {
+      max-height:200px;
+      overflow-y:auto;
+      background:rgba(248,249,250,0.7);
+      border-radius:6px;
+      padding:8px;
+    }
+
+    #historyPanel ul {
+      list-style:none;
+      margin:0;
+      padding:0;
+    }
+
+    #historyPanel li {
+      border-bottom:1px solid rgba(0,0,0,0.08);
+      padding:6px 0;
+      font-size:12px;
+    }
+
+    #historyPanel li:last-child {
+      border-bottom:none;
+    }
   </style>
 </head>
 <body>
-  <div style="position:absolute;top:10px;right:10px;z-index:2000;background:rgba(255,255,255,0.95);padding:18px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);max-width:320px;">
-    <div id="status" style="margin-bottom:10px;font-weight:bold;font-size:12px;">Connecting...</div>
-    <form id="impactForm">
+  <div id="controlPanel">
+    <div id="status" class="panel-section" style="margin-bottom:10px;font-weight:bold;font-size:12px;">Connecting...</div>
+    <div id="authPanel" class="panel-section">
+      <div id="authStatusText" class="small-text" style="font-size:12px;font-weight:600;">Not signed in</div>
+      <form id="loginForm">
+        <input type="text" id="login_username" name="login_username" placeholder="Username" required>
+        <input type="password" id="login_password" name="login_password" placeholder="Password" required>
+        <button type="submit">Sign In</button>
+      </form>
+      <details id="registerDetails">
+        <summary class="small-text">Create an account</summary>
+        <form id="registerForm">
+          <input type="text" id="register_username" name="register_username" placeholder="Username" required>
+          <input type="email" id="register_email" name="register_email" placeholder="Email" required>
+          <input type="text" id="register_full_name" name="register_full_name" placeholder="Full Name (optional)">
+          <input type="password" id="register_password" name="register_password" placeholder="Password" required>
+          <button type="submit">Sign Up</button>
+        </form>
+      </details>
+      <button id="logoutButton" type="button">Sign Out</button>
+      <div id="authFeedback" class="small-text" style="margin-top:6px;"></div>
+    </div>
+    <div id="historyPanel" class="panel-section">
+      <h4 style="margin:0 0 6px 0;font-size:13px;">Recent Simulations</h4>
+      <div id="historyContent" class="small-text">Sign in to view your recent runs.</div>
+    </div>
+    <form id="impactForm" class="panel-section">
       <h3 style="margin-top:0">Asteroid Impact Settings</h3>
   <label for="latitude">Latitude:</label>
   <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
@@ -104,38 +224,207 @@
     import { setupCesiumVisualization } from './cesium-visualization.js';
     import { MeteorMadnessAPI } from './api-client.js';
     
-    // Store user input and pass to Cesium visualization
-    let userImpactSettings = {
-      latitude: 30.0,
-      longitude: 10.0,
-      elevation: 0.0,
-      crater_diameter: 1200,
-      blast_radius: 50000,
-      thermal_radius: 80000,
-      fireball_radius: 20000,
-      evacuation_radius: 100000
-    };
+    const impactForm = document.getElementById('impactForm');
+    const statusElement = document.getElementById('status');
+    const authStatus = document.getElementById('authStatusText');
+    const authFeedback = document.getElementById('authFeedback');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const logoutButton = document.getElementById('logoutButton');
+    const registerDetails = document.getElementById('registerDetails');
+    const historyContent = document.getElementById('historyContent');
 
-    // Initialize API client
+    const numericFields = [
+      'latitude', 'longitude', 'elevation', 'crater_diameter', 'blast_radius',
+      'thermal_radius', 'fireball_radius', 'evacuation_radius', 'asteroid_size',
+      'asteroid_speed', 'asteroid_mass', 'asteroid_density', 'launch_latitude',
+      'launch_longitude', 'launch_altitude'
+    ];
+
+    function readImpactForm() {
+      const values = {};
+      numericFields.forEach((field) => {
+        const input = document.getElementById(field);
+        if (input) {
+          const parsed = parseFloat(input.value);
+          values[field] = Number.isNaN(parsed) ? 0 : parsed;
+        }
+      });
+      return values;
+    }
+
+    function updateImpactFormFromSettings(settings) {
+      numericFields.forEach((field) => {
+        if (settings[field] !== undefined && !Number.isNaN(settings[field])) {
+          const input = document.getElementById(field);
+          if (input) {
+            input.value = settings[field];
+          }
+        }
+      });
+    }
+
+    let userImpactSettings = readImpactForm();
+
+    function setImpactSettings(nextSettings) {
+      userImpactSettings = { ...userImpactSettings, ...nextSettings };
+    }
+
+    window.getImpactSettings = () => ({ ...userImpactSettings });
+
+    impactForm.addEventListener('input', () => {
+      setImpactSettings(readImpactForm());
+    });
+
     const api = new MeteorMadnessAPI();
 
-    // Check backend connection on page load
+    const authState = {
+      profile: null,
+    };
+
+    function setAuthFeedback(message, type = 'info') {
+      authFeedback.textContent = message || '';
+      if (!message) {
+        return;
+      }
+
+      const colors = {
+        info: '#4a4a4a',
+        error: '#dc3545',
+        success: '#28a745'
+      };
+      authFeedback.style.color = colors[type] || colors.info;
+    }
+
+    function updateAuthUI() {
+      if (authState.profile) {
+        authStatus.textContent = `Signed in as ${authState.profile.username}`;
+        authStatus.style.color = '#155724';
+        loginForm.style.display = 'none';
+        registerDetails.style.display = 'none';
+        logoutButton.style.display = 'block';
+        registerDetails.open = false;
+      } else {
+        authStatus.textContent = 'Not signed in';
+        authStatus.style.color = '#4a4a4a';
+        loginForm.style.display = 'flex';
+        registerDetails.style.display = 'block';
+        logoutButton.style.display = 'none';
+      }
+    }
+
+    async function refreshSimulationHistory() {
+      if (!historyContent) {
+        return;
+      }
+
+      if (!api._getAuthToken()) {
+        historyContent.textContent = 'Sign in to view your recent runs.';
+        return;
+      }
+
+      historyContent.textContent = 'Loading history...';
+      try {
+        const history = await api.getSimulationHistory({ limit: 5 });
+        if (!history.simulations || history.simulations.length === 0) {
+          historyContent.textContent = 'No saved simulations yet. Run one to see it here.';
+          return;
+        }
+
+        const list = document.createElement('ul');
+        history.simulations.forEach((sim) => {
+          const item = document.createElement('li');
+          const createdAt = new Date(sim.created_at).toLocaleString();
+          const crater = Math.round(sim.impact_result.crater_diameter).toLocaleString();
+          const blastKm = (sim.impact_result.blast_radius / 1000).toFixed(1);
+          item.innerHTML = `<strong>${createdAt}</strong><br><span>Crater: ${crater} m • Blast: ${blastKm} km</span>`;
+          list.appendChild(item);
+        });
+
+        historyContent.innerHTML = '';
+        historyContent.appendChild(list);
+      } catch (error) {
+        console.error('Failed to load history:', error);
+        historyContent.textContent = error.message || 'Unable to load history.';
+      }
+    }
+
+    async function bootstrapAuth() {
+      if (api._getAuthToken()) {
+        try {
+          authState.profile = await api.getProfile();
+          setAuthFeedback(`Welcome back, ${authState.profile.username}!`, 'success');
+        } catch (error) {
+          console.warn('Unable to restore session:', error);
+          authState.profile = null;
+          setAuthFeedback('Session expired. Please sign in again.', 'error');
+        }
+      }
+      updateAuthUI();
+      await refreshSimulationHistory();
+    }
+
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(loginForm);
+      setAuthFeedback('Signing in...', 'info');
+      try {
+        await api.loginUser({
+          username: formData.get('login_username'),
+          password: formData.get('login_password')
+        });
+        authState.profile = await api.getProfile();
+        setAuthFeedback(`Signed in as ${authState.profile.username}`, 'success');
+        loginForm.reset();
+        updateAuthUI();
+        await refreshSimulationHistory();
+      } catch (error) {
+        setAuthFeedback(error.message || 'Login failed', 'error');
+      }
+    });
+
+    registerForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(registerForm);
+      setAuthFeedback('Creating account...', 'info');
+      try {
+        await api.registerUser({
+          username: formData.get('register_username'),
+          email: formData.get('register_email'),
+          full_name: formData.get('register_full_name') || undefined,
+          password: formData.get('register_password')
+        });
+        setAuthFeedback('Account created! Please sign in.', 'success');
+        registerForm.reset();
+      } catch (error) {
+        setAuthFeedback(error.message || 'Registration failed', 'error');
+      }
+    });
+
+    logoutButton.addEventListener('click', async () => {
+      api.clearStoredTokens();
+      authState.profile = null;
+      setAuthFeedback('Signed out.', 'info');
+      updateAuthUI();
+      await refreshSimulationHistory();
+    });
+
     async function checkBackendConnection() {
       try {
         const version = await api.getVersion();
         console.log('Backend connected:', version);
-        document.getElementById('status').textContent = `Backend Connected (v${version.version})`;
-        document.getElementById('status').style.color = 'green';
+        statusElement.textContent = `Backend Connected (v${version.version})`;
+        statusElement.style.color = 'green';
       } catch (error) {
         console.error('Backend connection failed:', error);
-        document.getElementById('status').textContent = 'Backend Disconnected';
-        document.getElementById('status').style.color = 'red';
+        statusElement.textContent = 'Backend Disconnected';
+        statusElement.style.color = 'red';
       }
     }
 
-    document.getElementById('impactForm').addEventListener('submit', async function(e) {
+    impactForm.addEventListener('submit', async function(e) {
       e.preventDefault();
-      
+
       // Show loading state
       const submitButton = e.target.querySelector('button[type="submit"]');
       const originalText = submitButton.textContent;
@@ -143,24 +432,7 @@
       submitButton.disabled = true;
 
       try {
-        // Collect form data
-        const formData = {
-          latitude: parseFloat(document.getElementById('latitude').value),
-          longitude: parseFloat(document.getElementById('longitude').value),
-          elevation: parseFloat(document.getElementById('elevation').value),
-          crater_diameter: parseFloat(document.getElementById('crater_diameter').value),
-          blast_radius: parseFloat(document.getElementById('blast_radius').value),
-          thermal_radius: parseFloat(document.getElementById('thermal_radius').value),
-          fireball_radius: parseFloat(document.getElementById('fireball_radius').value),
-          evacuation_radius: parseFloat(document.getElementById('evacuation_radius').value),
-          asteroid_size: parseFloat(document.getElementById('asteroid_size').value),
-          asteroid_speed: parseFloat(document.getElementById('asteroid_speed').value),
-          asteroid_mass: parseFloat(document.getElementById('asteroid_mass').value),
-          asteroid_density: parseFloat(document.getElementById('asteroid_density').value),
-          launch_latitude: parseFloat(document.getElementById('launch_latitude').value),
-          launch_longitude: parseFloat(document.getElementById('launch_longitude').value),
-          launch_altitude: parseFloat(document.getElementById('launch_altitude').value)
-        };
+        const formData = readImpactForm();
 
         // Call backend simulation API
         const simulationResult = await api.simulateImpact(
@@ -177,14 +449,16 @@
           },
           {
             useNasaData: true,
-            useML: true
+            useML: true,
+            calculateTrajectory: true,
+            includeZones: true
           }
         );
 
         console.log('Simulation result:', simulationResult);
 
         // Update user settings with backend results
-        userImpactSettings = {
+        setImpactSettings({
           ...formData,
           // Use backend calculated values if available
           crater_diameter: simulationResult.impact_result?.crater_diameter || formData.crater_diameter,
@@ -192,48 +466,37 @@
           thermal_radius: simulationResult.impact_result?.thermal_radius || formData.thermal_radius,
           fireball_radius: simulationResult.impact_result?.fireball_radius || formData.fireball_radius,
           evacuation_radius: simulationResult.impact_result?.evacuation_radius || formData.evacuation_radius
-        };
+        });
 
         // Update form with backend results
         if (simulationResult.impact_result) {
-          document.getElementById('crater_diameter').value = simulationResult.impact_result.crater_diameter;
-          document.getElementById('blast_radius').value = simulationResult.impact_result.blast_radius;
-          document.getElementById('thermal_radius').value = simulationResult.impact_result.thermal_radius;
-          document.getElementById('fireball_radius').value = simulationResult.impact_result.fireball_radius;
-          document.getElementById('evacuation_radius').value = simulationResult.impact_result.evacuation_radius;
+          updateImpactFormFromSettings({
+            crater_diameter: simulationResult.impact_result.crater_diameter,
+            blast_radius: simulationResult.impact_result.blast_radius,
+            thermal_radius: simulationResult.impact_result.thermal_radius,
+            fireball_radius: simulationResult.impact_result.fireball_radius,
+            evacuation_radius: simulationResult.impact_result.evacuation_radius
+          });
+          setImpactSettings(readImpactForm());
         }
 
         // Trigger visualization update
-        window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: userImpactSettings }));
+        window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: { ...userImpactSettings } }));
 
         // Show success message
-        document.getElementById('status').textContent = 'Simulation Complete!';
-        document.getElementById('status').style.color = 'green';
+        statusElement.textContent = 'Simulation Complete!';
+        statusElement.style.color = 'green';
+
+        await refreshSimulationHistory();
 
       } catch (error) {
         console.error('Simulation failed:', error);
-        document.getElementById('status').textContent = 'Simulation Failed';
-        document.getElementById('status').style.color = 'red';
-        
+        statusElement.textContent = 'Simulation Failed';
+        statusElement.style.color = 'red';
+
         // Fallback to local simulation
-        userImpactSettings = {
-          latitude: parseFloat(document.getElementById('latitude').value),
-          longitude: parseFloat(document.getElementById('longitude').value),
-          elevation: parseFloat(document.getElementById('elevation').value),
-          crater_diameter: parseFloat(document.getElementById('crater_diameter').value),
-          blast_radius: parseFloat(document.getElementById('blast_radius').value),
-          thermal_radius: parseFloat(document.getElementById('thermal_radius').value),
-          fireball_radius: parseFloat(document.getElementById('fireball_radius').value),
-          evacuation_radius: parseFloat(document.getElementById('evacuation_radius').value),
-          asteroid_size: parseFloat(document.getElementById('asteroid_size').value),
-          asteroid_speed: parseFloat(document.getElementById('asteroid_speed').value),
-          asteroid_mass: parseFloat(document.getElementById('asteroid_mass').value),
-          asteroid_density: parseFloat(document.getElementById('asteroid_density').value),
-          launch_latitude: parseFloat(document.getElementById('launch_latitude').value),
-          launch_longitude: parseFloat(document.getElementById('launch_longitude').value),
-          launch_altitude: parseFloat(document.getElementById('launch_altitude').value)
-        };
-        window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: userImpactSettings }));
+        setImpactSettings(readImpactForm());
+        window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: { ...userImpactSettings } }));
       } finally {
         // Reset button state
         submitButton.textContent = originalText;
@@ -241,10 +504,9 @@
       }
     });
 
-    window.getImpactSettings = () => userImpactSettings;
-    
     // Initialize
     checkBackendConnection();
+    bootstrapAuth();
     setupCesiumVisualization('cesiumContainer');
   </script>
 </body>

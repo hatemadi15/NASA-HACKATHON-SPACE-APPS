@@ -1,10 +1,11 @@
-"""
-Main FastAPI application entry point
-"""
+"""Main FastAPI application entry point."""
+
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -41,6 +42,26 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Serve the bundled frontend from within the API process so review environments
+# only require a single Uvicorn instance.
+_frontend_root = Path(__file__).resolve().parent.parent
+_frontend_index = _frontend_root / "index.html"
+
+if _frontend_index.exists():
+    app.mount(
+        "/ui",
+        StaticFiles(directory=str(_frontend_root), html=True),
+        name="meteor-madness-ui",
+    )
+
+
+@app.get("/ui", include_in_schema=False)
+async def ui_redirect():
+    """Redirect bare /ui requests so relative assets resolve correctly."""
+    if not _frontend_index.exists():
+        raise HTTPException(status_code=404, detail="Frontend bundle not available")
+    return RedirectResponse(url="/ui/")
 
 @app.get("/")
 async def root():
