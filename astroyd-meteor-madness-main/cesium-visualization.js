@@ -10,11 +10,30 @@ export function setupCesiumVisualization(containerId) {
   }
 }
 
-function runCesium(containerId) {
+async function runCesium(containerId) {
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ODM4NDkyMC04ZDc1LTRkNmYtYjRlNi1hN2YyYTkzYzI1OWIiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODMyODN9.8Oh3jFNzuWbGuNUYmt6VewXvFwKuqQwrWoeCw1VfVi8';
   const viewer = new Cesium.Viewer(containerId, {
     terrain: Cesium.Terrain.fromWorldTerrain(),
+    baseLayerPicker: false,
+    timeline: false,
+    animation: false,
+    geocoder: false,
   });
+
+  try {
+    const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(2);
+    viewer.imageryLayers.removeAll();
+    viewer.imageryLayers.addImageryProvider(imageryProvider);
+  } catch (error) {
+    console.warn('Falling back to default imagery:', error);
+    if (viewer.imageryLayers.length === 0) {
+      viewer.imageryLayers.addImageryProvider(Cesium.createWorldImagery());
+    }
+  }
+
+  viewer.scene.globe.show = true;
+  viewer.scene.skyAtmosphere.show = true;
+  viewer.scene.globe.enableLighting = true;
 
   // State
   const state = {

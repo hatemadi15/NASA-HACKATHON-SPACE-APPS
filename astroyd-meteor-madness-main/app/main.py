@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
@@ -54,6 +54,14 @@ if _frontend_index.exists():
         StaticFiles(directory=str(_frontend_root), html=True),
         name="meteor-madness-ui",
     )
+
+
+@app.get("/ui", include_in_schema=False)
+async def ui_redirect():
+    """Redirect bare /ui requests so relative assets resolve correctly."""
+    if not _frontend_index.exists():
+        raise HTTPException(status_code=404, detail="Frontend bundle not available")
+    return RedirectResponse(url="/ui/")
 
 @app.get("/")
 async def root():
