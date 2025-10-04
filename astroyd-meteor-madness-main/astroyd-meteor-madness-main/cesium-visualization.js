@@ -11,7 +11,7 @@ export function setupCesiumVisualization(containerId) {
 }
 
 function runCesium(containerId) {
-  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyNDMzMTYwMy1hNDI2LTQ0NjAtOGM5MC02OGNhOGIwOGM0ODEiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTY5ODE5MDl9.MziOOEJHn4bXXuOm-RkxvZ8fD9YgqkOGyfbflKkxjaY';
+  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ODM4NDkyMC04ZDc1LTRkNmYtYjRlNi1hN2YyYTkzYzI1OWIiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODMyODN9.8Oh3jFNzuWbGuNUYmt6VewXvFwKuqQwrWoeCw1VfVi8';
   const viewer = new Cesium.Viewer(containerId, {
     terrain: Cesium.Terrain.fromWorldTerrain(),
   });
@@ -46,27 +46,12 @@ function runCesium(containerId) {
   );
 
   // Listen for user input changes
-  window.addEventListener('impactSettingsChanged', (e) => {
-    impact_location = { ...e.detail };
-    impact_result = {
-      blast_radius: impact_location.blast_radius,
-      crater_diameter: impact_location.crater_diameter,
-      thermal_radius: impact_location.thermal_radius,
-      fireball_radius: impact_location.fireball_radius,
-      evacuation_radius: impact_location.evacuation_radius
-    };
-    asteroid_properties = {
-      size: impact_location.asteroid_size || 50,
-      speed: impact_location.asteroid_speed || 20000,
-      mass: impact_location.asteroid_mass || 1000000,
-      density: impact_location.asteroid_density || 3000
-    };
-    impactCartesian = Cesium.Cartesian3.fromDegrees(
-      impact_location.longitude,
-      impact_location.latitude,
-      impact_location.elevation
-    );
-    resetSimulation();
+  window.addEventListener('impactSettingsChanged', (event) => {
+    if (!event || typeof event.detail !== 'object') {
+      resetSimulation();
+      return;
+    }
+    resetSimulation(event.detail);
   });
 
   // Animation cleanup function
@@ -420,7 +405,7 @@ function runCesium(containerId) {
       });
     }
   });
-  function resetSimulation() {
+  function resetSimulation(nextSettings = null) {
     viewer.entities.removeAll();
     state.visualizationEntities.clear();
     state.craterEntities.clear();
@@ -428,13 +413,22 @@ function runCesium(containerId) {
     document.getElementById('toggleButton').style.display = 'none';
     document.getElementById('toggleButton').textContent = 'Show Crater';
     // Always use latest user input
-    impact_location = { ...window.getImpactSettings() };
+    const latestSettings = nextSettings && typeof nextSettings === 'object'
+      ? nextSettings
+      : window.getImpactSettings();
+    impact_location = { ...latestSettings };
     impact_result = {
       blast_radius: impact_location.blast_radius,
       crater_diameter: impact_location.crater_diameter,
       thermal_radius: impact_location.thermal_radius,
       fireball_radius: impact_location.fireball_radius,
       evacuation_radius: impact_location.evacuation_radius
+    };
+    asteroid_properties = {
+      size: impact_location.asteroid_size || 50,
+      speed: impact_location.asteroid_speed || 20000,
+      mass: impact_location.asteroid_mass || 1000000,
+      density: impact_location.asteroid_density || 3000
     };
     impactCartesian = Cesium.Cartesian3.fromDegrees(
       impact_location.longitude,
@@ -456,7 +450,10 @@ function runCesium(containerId) {
       }
     });
   }
-  document.getElementById('launchButton').addEventListener('click', resetSimulation);
+  const launchButton = document.getElementById('launchButton');
+  if (launchButton) {
+    launchButton.addEventListener('click', resetSimulation);
+  }
   // Initial setup
   // resetSimulation(); // Remove this line so asteroid only launches on button click
 }
