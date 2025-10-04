@@ -3,15 +3,18 @@ Enhanced simulation API endpoints with trajectory, zones, and deflection game
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.encoders import jsonable_encoder
 from typing import List, Dict, Any, Optional
 import uuid
 import math
 from datetime import datetime, timedelta
+import logging
+import json
 
 from app.models.asteroid import AsteroidCreate, AsteroidResponse
 from app.models.impact import (
-	ImpactLocation, 
-	SimulationRequest, 
+        ImpactLocation,
+        SimulationRequest,
 	SimulationResponse,
 	ImpactResult,
 	DamageAssessment,
@@ -19,9 +22,9 @@ from app.models.impact import (
 	ImpactZone,
 	MitigationResult,
 	Warning,
-	DeflectionGameScore,
-	DeflectionGameScoreResponse,
-	SolutionMethod
+        DeflectionGameScore,
+        DeflectionGameScoreResponse,
+        SolutionMethod
 )
 from app.physics.impact_calculator import impact_calculator
 from app.physics.damage_assessor import damage_assessor
@@ -30,19 +33,47 @@ from app.services.geo_enrichment import geo_enrichment_service
 from app.ml.enhancer import ml_enhancer
 from app.core.database import get_db
 from app.core.models import Simulation, DeflectionGameScoreDB, User
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_current_user_optional
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # In-memory storage for demo (replace with database in production)
 _solutions_cache: List[SolutionMethod] = []
 
+
+class SimulationHistoryEntry(BaseModel):
+	"""Serialized simulation entry for history responses"""
+
+	simulation_id: str
+	created_at: datetime
+	asteroid: AsteroidResponse
+	impact_location: ImpactLocation
+	impact_result: ImpactResult
+	damage_assessment: DamageAssessment
+	trajectory: Optional[List[TrajectoryPoint]] = None
+	impact_zones: Optional[List[ImpactZone]] = None
+	mitigation_result: Optional[MitigationResult] = None
+	warnings: List[Warning] = Field(default_factory=list)
+	simulation_metadata: Dict[str, Any]
+	request_parameters: Dict[str, Any]
+
+
+class SimulationHistoryResponse(BaseModel):
+	"""Paginated simulation history list"""
+
+	total: int
+	skip: int
+	limit: int
+	simulations: List[SimulationHistoryEntry]
+
 @router.post("/simulate", response_model=SimulationResponse)
 async def simulate_impact(
-	request: SimulationRequest,
-	db: Session = Depends(get_db),
-	current_user: Optional[User] = Depends(get_current_user)
+        request: SimulationRequest,
+        db: Session = Depends(get_db),
+        current_user: Optional[User] = Depends(get_current_user_optional)
 ):
 	"""
 	Enhanced meteor impact simulation with trajectory and environmental zones
@@ -165,59 +196,142 @@ async def simulate_impact(
 
 		# Create simulation response
 		response = SimulationResponse(
-			simulation_id=simulation_id,
-			asteroid=asteroid_response,
-			impact_location=location,
-			impact_result=impact_result,
-			mitigation_result=mitigation_result,
-			trajectory=trajectory,
-			warnings=warnings,
-			simulation_metadata={
-				"timestamp": datetime.utcnow().isoformat(),
-				"version": "2.0.0",
-				"calculation_method": "enhanced_physics",
-				"data_enriched": request.use_nasa_data,
-				"ml_enhanced": request.use_ml,
-				"deflection_applied": bool(request.dv_mps > 0.0),
-				"dv_mps": request.dv_mps,
-				"deflection_method": request.deflection_method,
-				"provenance": {
-					"population": "demo_or_cached",
-					"terrain": "demo_or_cached",
-					"imagery": "demo_or_cached"
-				}
-			},
-			population_density=location.population_density,
-			elevation=location.elevation,
-			terrain_type=str(location.terrain_type)
+				simulation_id=simulation_id,
+				asteroid=asteroid_response.model_dump(),
+				impact_location=location.model_dump(),
+				impact_result=impact_result,
+				mitigation_result=mitigation_result,
+				trajectory=trajectory,
+				warnings=warnings,
+				simulation_metadata={
+					"timestamp": datetime.utcnow().isoformat(),
+					"version": "2.0.0",
+					"calculation_method": "enhanced_physics",
+					"data_enriched": request.use_nasa_data,
+					"ml_enhanced": request.use_ml,
+					"deflection_applied": bool(request.dv_mps > 0.0),
+					"dv_mps": request.dv_mps,
+					"deflection_method": request.deflection_method,
+					"provenance": {
+						"population": "demo_or_cached",
+						"terrain": "demo_or_cached",
+						"imagery": "demo_or_cached"
+					}
+				},
+				population_density=location.population_density,
+				elevation=location.elevation,
+				terrain_type=str(location.terrain_type)
 		)
 
+		# Save simulation to database
 		# Save simulation to database
 		try:
 			db_simulation = Simulation(
 				simulation_id=simulation_id,
 				user_id=current_user.id if current_user else None,
-				asteroid_data=asteroid_response.dict(),
-				impact_location=location.dict(),
-				simulation_request=request.dict(),
-				impact_result=impact_result.dict(),
-				damage_assessment=damage_assessment_model.dict(),
-				trajectory_data=[point.dict() for point in trajectory] if trajectory else None,
-				impact_zones=[zone.dict() for zone in impact_zones] if impact_zones else None,
-				mitigation_result=mitigation_result.dict() if mitigation_result else None,
-				warnings=[warning.dict() for warning in warnings] if warnings else None,
-				simulation_metadata=response.simulation_metadata
+				asteroid_data=jsonable_encoder(asteroid_response),
+				impact_location=jsonable_encoder(location),
+				simulation_request=jsonable_encoder(request),
+				impact_result=jsonable_encoder(impact_result),
+				damage_assessment=jsonable_encoder(damage_assessment_model),
+				trajectory_data=jsonable_encoder(trajectory) if trajectory else None,
+				impact_zones=jsonable_encoder(impact_zones) if impact_zones else None,
+				mitigation_result=jsonable_encoder(mitigation_result) if mitigation_result else None,
+				warnings=jsonable_encoder(warnings) if warnings else None,
+				simulation_metadata=jsonable_encoder(response.simulation_metadata)
 			)
 			db.add(db_simulation)
 			db.commit()
+			db.refresh(db_simulation)
 		except Exception as e:
-			logger.error(f"Failed to save simulation to database: {e}")
+			db.rollback()
+			logger.error("Failed to save simulation to database: %s", e, exc_info=True)
 			# Continue without failing the request
 
 		return response
 
 	except Exception as e:
 		raise HTTPException(status_code=500, detail=f"Simulation failed: {str(e)}")
+
+
+@router.get("/history", response_model=SimulationHistoryResponse)
+async def get_simulation_history(
+	skip: int = 0,
+	limit: int = 20,
+	db: Session = Depends(get_db),
+	current_user: Optional[User] = Depends(get_current_user)
+):
+	"""Return paginated simulation history for the current user"""
+	if not current_user:
+		raise HTTPException(status_code=401, detail="Authentication required")
+
+	if limit <= 0 or limit > 100:
+		raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
+
+	base_query = db.query(Simulation).filter(
+		Simulation.user_id == current_user.id
+	).order_by(Simulation.created_at.desc())
+
+	total = base_query.count()
+	simulations = base_query.offset(max(0, skip)).limit(limit).all()
+
+	history_entries: List[SimulationHistoryEntry] = []
+	for record in simulations:
+		try:
+			asteroid_payload = _ensure_json_struct(record.asteroid_data, {})
+			location_payload = _ensure_json_struct(record.impact_location, {})
+			impact_result_payload = _ensure_json_struct(record.impact_result, {})
+			damage_payload = _ensure_json_struct(record.damage_assessment, {})
+			trajectory_payload = _ensure_json_struct(record.trajectory_data, None)
+			impact_zones_payload = _ensure_json_struct(record.impact_zones, None)
+			mitigation_payload = _ensure_json_struct(record.mitigation_result, None)
+			warnings_payload = _ensure_json_struct(record.warnings, [])
+			metadata_payload = _ensure_json_struct(record.simulation_metadata, {})
+			request_payload = _ensure_json_struct(record.simulation_request, {})
+
+			history_entries.append(
+				SimulationHistoryEntry(
+					simulation_id=record.simulation_id,
+					created_at=record.created_at,
+					asteroid=AsteroidResponse(**asteroid_payload),
+					impact_location=ImpactLocation(**location_payload),
+					impact_result=ImpactResult(**impact_result_payload),
+					damage_assessment=DamageAssessment(**damage_payload),
+					trajectory=[TrajectoryPoint(**point) for point in trajectory_payload] if trajectory_payload else None,
+					impact_zones=[ImpactZone(**zone) for zone in impact_zones_payload] if impact_zones_payload else None,
+					mitigation_result=MitigationResult(**mitigation_payload) if mitigation_payload else None,
+					warnings=[Warning(**warning) for warning in warnings_payload] if warnings_payload else [],
+					simulation_metadata=metadata_payload,
+					request_parameters=request_payload,
+				)
+			)
+		except Exception as exc:
+			logger.error("Failed to deserialize simulation history entry %s: %s", record.simulation_id, exc, exc_info=True)
+
+	return SimulationHistoryResponse(
+		total=total,
+		skip=max(0, skip),
+		limit=limit,
+		simulations=history_entries
+	)
+
+def _ensure_json_struct(payload: Any, default: Any) -> Any:
+        """Safely decode JSON payloads stored in the database."""
+
+        if payload is None:
+                return default
+
+        if isinstance(payload, (dict, list)):
+                return payload
+
+        if isinstance(payload, str):
+                try:
+                        return json.loads(payload)
+                except json.JSONDecodeError:
+                        logger.error("Failed to decode JSON payload: %s", payload[:200] if isinstance(payload, str) else payload)
+                        return default
+
+        return default
 
 async def _calculate_impact_zones(asteroid, location, impact_data) -> List[ImpactZone]:
 	"""Calculate environmental impact zones"""

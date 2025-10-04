@@ -7,11 +7,12 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field, field_validator
 import logging
+import re
 
 from app.core.database import get_db
-from app.core.models import User, UserSession, SystemLog
+from app.core.models import User, UserSession, Simulation, DeflectionGameScoreDB, SimulationExport
 from app.core.auth import (
     authenticate_user, create_access_token, create_refresh_token,
     get_password_hash, verify_token, get_current_user, get_current_active_user,
@@ -23,15 +24,48 @@ router = APIRouter()
 security = HTTPBearer()
 
 # Pydantic models for requests/responses
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class UserCreate(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-    full_name: Optional[str] = None
+    username: str = Field(..., min_length=3, max_length=50)
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=6, max_length=128)
+    full_name: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str) -> str:
+        username = value.strip()
+        if not username:
+            raise ValueError("Username cannot be empty")
+        return username
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        email = value.strip().lower()
+        if not EMAIL_REGEX.match(email):
+            raise ValueError("Invalid email address format")
+        return email
+
+    @field_validator("full_name")
+    @classmethod
+    def normalize_full_name(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if value else value
+
 
 class UserLogin(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def normalize_login_username(cls, value: str) -> str:
+        username = value.strip()
+        if not username:
+            raise ValueError("Username cannot be empty")
+        return username
 
 class UserResponse(BaseModel):
     id: int
@@ -58,6 +92,29 @@ class UserProfile(BaseModel):
     game_scores_count: int
     exports_count: int
     created_at: datetime
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.get("/me", response_model=UserProfile)
+async def get_profile(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Return the authenticated user's profile and usage counts."""
+
+    simulations_count = db.query(Simulation).filter(Simulation.user_id == current_user.id).count()
+    game_scores_count = db.query(DeflectionGameScoreDB).filter(DeflectionGameScoreDB.user_id == current_user.id).count()
+    exports_count = db.query(SimulationExport).filter(SimulationExport.user_id == current_user.id).count()
+
+    return UserProfile(
+        username=current_user.username,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        simulations_count=simulations_count,
+        game_scores_count=game_scores_count,
+        exports_count=exports_count,
+        created_at=current_user.created_at,
+    )
 
 @router.post("/register", response_model=UserResponse)
 async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -158,19 +215,19 @@ async def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    refresh_token: str,
+    payload: RefreshRequest,
     db: Session = Depends(get_db)
 ):
     """Refresh access token using refresh token"""
     try:
-        payload = verify_token(refresh_token)
-        if not payload or payload.get("type") != "refresh":
+        token_payload = verify_token(payload.refresh_token)
+        if not token_payload or token_payload.get("type") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid refresh token"
             )
-        
-        username = payload.get("sub")
+
+        username = token_payload.get("sub")
         if not username:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -203,39 +260,10 @@ async def refresh_token(
             detail="Token refresh failed"
         )
 
-@router.get("/me", response_model=UserProfile)
-async def get_current_user_profile(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get current user profile with statistics"""
-    try:
-        # Get user statistics
-        simulations_count = len(current_user.simulations)
-        game_scores_count = len(current_user.game_scores)
-        exports_count = len(current_user.exports)
-        
-        return UserProfile(
-            username=current_user.username,
-            email=current_user.email,
-            full_name=current_user.full_name,
-            simulations_count=simulations_count,
-            game_scores_count=game_scores_count,
-            exports_count=exports_count,
-            created_at=current_user.created_at
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to get user profile: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get user profile"
-        )
-
 @router.put("/me", response_model=UserResponse)
 async def update_user_profile(
     full_name: Optional[str] = None,
-    email: Optional[EmailStr] = None,
+    email: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -243,12 +271,19 @@ async def update_user_profile(
     try:
         # Update fields if provided
         if full_name is not None:
-            current_user.full_name = full_name
-        
+            current_user.full_name = full_name.strip() if full_name else None
+
         if email is not None:
+            normalized_email = email.strip().lower()
+            if not EMAIL_REGEX.match(normalized_email):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid email address format"
+                )
+
             # Check if email is already taken
             existing_email = db.query(User).filter(
-                User.email == email,
+                User.email == normalized_email,
                 User.id != current_user.id
             ).first()
             if existing_email:
@@ -256,7 +291,7 @@ async def update_user_profile(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Email already in use"
                 )
-            current_user.email = email
+            current_user.email = normalized_email
         
         current_user.updated_at = datetime.utcnow()
         db.commit()

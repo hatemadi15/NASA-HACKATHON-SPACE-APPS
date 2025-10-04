@@ -8,18 +8,41 @@ import csv
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from io import BytesIO
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-import numpy as np
-from PIL import Image as PILImage
 import logging
+
+try:  # Optional heavy dependencies
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    REPORTLAB_AVAILABLE = True
+except ImportError:  # pragma: no cover - optional dependency guard
+    REPORTLAB_AVAILABLE = False
+    letter = A4 = None  # type: ignore
+    ParagraphStyle = Paragraph = Spacer = Table = TableStyle = Image = None  # type: ignore
+    colors = None  # type: ignore
+    TA_CENTER = TA_LEFT = None  # type: ignore
+
+try:  # Matplotlib stack may not be installed in slim environments
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    plt = patches = FigureCanvasAgg = None  # type: ignore
+    MATPLOTLIB_AVAILABLE = False
+
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover
+    np = None  # type: ignore
+
+try:
+    from PIL import Image as PILImage
+except ImportError:  # pragma: no cover
+    PILImage = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +55,12 @@ class SimulationExporter:
     
     def export_to_pdf(self, simulation_data: Dict[str, Any], filename: str = None) -> str:
         """Export simulation to PDF report"""
+        if not REPORTLAB_AVAILABLE:
+            raise RuntimeError(
+                "PDF export requires the optional 'reportlab' package. "
+                "Please install it to enable report generation."
+            )
+
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"simulation_report_{timestamp}.pdf"
@@ -234,6 +263,11 @@ class SimulationExporter:
     
     def create_impact_visualization(self, simulation_data: Dict[str, Any], filename: str = None) -> str:
         """Create impact zone visualization image"""
+        if not MATPLOTLIB_AVAILABLE:
+            raise RuntimeError(
+                "Impact visualization export requires the optional 'matplotlib' stack."
+            )
+
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"impact_visualization_{timestamp}.png"
