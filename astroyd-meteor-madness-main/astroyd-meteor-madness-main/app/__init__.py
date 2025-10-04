@@ -1,1 +1,0 @@
-# NASA Meteor Simulator Backend
