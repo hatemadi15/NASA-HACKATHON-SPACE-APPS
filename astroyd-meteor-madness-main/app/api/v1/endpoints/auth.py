@@ -7,8 +7,9 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field, field_validator
 import logging
+import re
 
 from app.core.database import get_db
 from app.core.models import User, UserSession, Simulation, DeflectionGameScoreDB, SimulationExport
@@ -23,15 +24,48 @@ router = APIRouter()
 security = HTTPBearer()
 
 # Pydantic models for requests/responses
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class UserCreate(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-    full_name: Optional[str] = None
+    username: str = Field(..., min_length=3, max_length=50)
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=6, max_length=128)
+    full_name: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str) -> str:
+        username = value.strip()
+        if not username:
+            raise ValueError("Username cannot be empty")
+        return username
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        email = value.strip().lower()
+        if not EMAIL_REGEX.match(email):
+            raise ValueError("Invalid email address format")
+        return email
+
+    @field_validator("full_name")
+    @classmethod
+    def normalize_full_name(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if value else value
+
 
 class UserLogin(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def normalize_login_username(cls, value: str) -> str:
+        username = value.strip()
+        if not username:
+            raise ValueError("Username cannot be empty")
+        return username
 
 class UserResponse(BaseModel):
     id: int
@@ -229,7 +263,7 @@ async def refresh_token(
 @router.put("/me", response_model=UserResponse)
 async def update_user_profile(
     full_name: Optional[str] = None,
-    email: Optional[EmailStr] = None,
+    email: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -237,12 +271,19 @@ async def update_user_profile(
     try:
         # Update fields if provided
         if full_name is not None:
-            current_user.full_name = full_name
-        
+            current_user.full_name = full_name.strip() if full_name else None
+
         if email is not None:
+            normalized_email = email.strip().lower()
+            if not EMAIL_REGEX.match(normalized_email):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid email address format"
+                )
+
             # Check if email is already taken
             existing_email = db.query(User).filter(
-                User.email == email,
+                User.email == normalized_email,
                 User.id != current_user.id
             ).first()
             if existing_email:
@@ -250,7 +291,7 @@ async def update_user_profile(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Email already in use"
                 )
-            current_user.email = email
+            current_user.email = normalized_email
         
         current_user.updated_at = datetime.utcnow()
         db.commit()

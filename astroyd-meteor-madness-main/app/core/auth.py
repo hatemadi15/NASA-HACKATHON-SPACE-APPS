@@ -19,7 +19,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+try:
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    # Probe hashing to ensure the backend is available at runtime
+    pwd_context.hash("healthcheck")
+except Exception as exc:  # pragma: no cover - fallback for restricted environments
+    logger.warning(
+        "bcrypt backend unavailable (%s); falling back to pbkdf2_sha256 hashing", exc
+    )
+    pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # JWT settings
 SECRET_KEY = settings.SECRET_KEY
