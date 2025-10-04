@@ -55,6 +55,26 @@
     #cameraToggleButton:hover {
       background: rgba(0, 153, 255, 0.8);
     }
+    #neoToggleButton {
+      position: absolute;
+      top: 10px;
+      left: 450px;
+      z-index: 1000;
+      padding: 10px 20px;
+      background: rgba(0, 200, 150, 0.85);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    #neoToggleButton.loading {
+      cursor: progress;
+      opacity: 0.7;
+    }
+    #neoToggleButton:hover {
+      background: rgba(0, 220, 170, 0.85);
+    }
     #authButton {
         position: absolute;
         top: 10px;
@@ -264,6 +284,7 @@
   <div id="cesiumContainer"></div>
   <button id="toggleButton">Toggle View</button>
   <button id="cameraToggleButton">Follow Asteroid</button>
+  <button id="neoToggleButton" type="button">Show NEOs</button>
   <button id="launchButton" type="button">Launch Simulation</button>
   <script type="module">
     import { setupCesiumVisualization } from './cesium-visualization.js';

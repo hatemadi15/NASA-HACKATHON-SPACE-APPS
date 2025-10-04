@@ -2,24 +2,12 @@
 File export utilities for simulations
 """
 
-import os
-import json
 import csv
-from datetime import datetime
-from typing import Dict, Any, List, Optional
-from io import BytesIO
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-import numpy as np
-from PIL import Image as PILImage
+import json
 import logging
+import os
+from datetime import datetime
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +20,17 @@ class SimulationExporter:
     
     def export_to_pdf(self, simulation_data: Dict[str, Any], filename: str = None) -> str:
         """Export simulation to PDF report"""
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.enums import TA_CENTER
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        except ImportError as exc:  # pragma: no cover - depends on optional extras
+            raise RuntimeError(
+                "PDF export requires the 'reportlab' package. Install optional dependencies to enable this feature."
+            ) from exc
+
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"simulation_report_{timestamp}.pdf"
@@ -237,9 +236,17 @@ class SimulationExporter:
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"impact_visualization_{timestamp}.png"
-        
+
         filepath = os.path.join(self.output_dir, filename)
-        
+
+        try:
+            import matplotlib.patches as patches
+            import matplotlib.pyplot as plt
+        except ImportError as exc:  # pragma: no cover - depends on optional extras
+            raise RuntimeError(
+                "Impact visualization requires the 'matplotlib' package. Install optional dependencies to enable this feature."
+            ) from exc
+
         # Create figure
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         
