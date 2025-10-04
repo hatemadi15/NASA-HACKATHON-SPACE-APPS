@@ -11,10 +11,39 @@ export function setupCesiumVisualization(containerId) {
 }
 
 function runCesium(containerId) {
-  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyNDMzMTYwMy1hNDI2LTQ0NjAtOGM5MC02OGNhOGIwOGM0ODEiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTY5ODE5MDl9.MziOOEJHn4bXXuOm-RkxvZ8fD9YgqkOGyfbflKkxjaY';
-  const viewer = new Cesium.Viewer(containerId, {
-    terrain: Cesium.Terrain.fromWorldTerrain(),
-  });
+  const container = document.getElementById(containerId);
+  if (!container) {
+    console.error(`Cesium container "${containerId}" was not found.`);
+    return;
+  }
+
+  const resolvedToken =
+    container.dataset.cesiumIonToken ||
+    (typeof window !== 'undefined' ? window.CESIUM_ION_TOKEN : undefined) ||
+    null;
+
+  let viewer;
+  if (resolvedToken) {
+    Cesium.Ion.defaultAccessToken = resolvedToken;
+    viewer = new Cesium.Viewer(containerId, {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+    });
+  } else {
+    console.warn(
+      'No Cesium Ion token supplied. Falling back to OpenStreetMap imagery and ellipsoid terrain.'
+    );
+    viewer = new Cesium.Viewer(containerId, {
+      imageryProvider: new Cesium.UrlTemplateImageryProvider({
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        credit: '© OpenStreetMap contributors',
+      }),
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+      baseLayerPicker: false,
+      geocoder: false,
+    });
+  }
+
+  viewer.scene.globe.depthTestAgainstTerrain = true;
 
   // State
   const state = {
@@ -45,6 +74,27 @@ function runCesium(containerId) {
     impact_location.elevation
   );
 
+  function focusCamera(duration = 0) {
+    const height = Math.max((impact_location.launch_altitude || 0) + 400000, 1500000);
+    const destination = Cesium.Cartesian3.fromDegrees(
+      impact_location.longitude,
+      impact_location.latitude,
+      height
+    );
+
+    viewer.scene.camera.flyTo({
+      destination,
+      duration,
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-55),
+        roll: 0,
+      },
+    });
+  }
+
+  focusCamera(0);
+
   // Listen for user input changes
   window.addEventListener('impactSettingsChanged', (e) => {
     impact_location = { ...e.detail };
@@ -66,6 +116,7 @@ function runCesium(containerId) {
       impact_location.latitude,
       impact_location.elevation
     );
+    focusCamera(1.5);
     resetSimulation();
   });
 
@@ -456,7 +507,11 @@ function runCesium(containerId) {
       }
     });
   }
-  document.getElementById('launchButton').addEventListener('click', resetSimulation);
-  // Initial setup
-  // resetSimulation(); // Remove this line so asteroid only launches on button click
+  const launchButton = document.getElementById('launchButton');
+  if (launchButton) {
+    launchButton.addEventListener('click', resetSimulation);
+  } else {
+    resetSimulation();
+  }
+  // Initial setup handled above
 }

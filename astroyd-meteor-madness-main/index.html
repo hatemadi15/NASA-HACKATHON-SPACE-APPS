@@ -5,7 +5,8 @@
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <style>
-    html, body, #cesiumContainer { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    html, body, #cesiumContainer { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; font-family: "Segoe UI", Tahoma, sans-serif; }
+    body { background: #0b0d17; }
     #toggleButton {
       position: absolute;
       top: 10px;
@@ -55,10 +56,124 @@
     #cameraToggleButton:hover {
       background: rgba(0, 153, 255, 0.8);
     }
+    #topBar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: linear-gradient(135deg, rgba(13, 19, 51, 0.95), rgba(27, 33, 86, 0.95));
+      border-bottom: 1px solid rgba(102, 126, 234, 0.35);
+      color: #f5f7ff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 2500;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(8px);
+    }
+    #topBar .brand {
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 15px;
+    }
+    #authControls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #authStatus {
+      font-size: 13px;
+      color: #dbe2ff;
+    }
+    #authActionButton {
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #4461ff, #6b8bff);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 6px 18px rgba(68, 97, 255, 0.35);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    #authActionButton:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(68, 97, 255, 0.45);
+    }
+    #loginPanel {
+      position: absolute;
+      top: 64px;
+      right: 20px;
+      z-index: 2600;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 12px;
+      box-shadow: 0 16px 40px rgba(13, 23, 56, 0.28);
+      padding: 18px 20px 22px;
+      width: 260px;
+      display: none;
+    }
+    #loginPanel h4 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: #0b0d17;
+    }
+    #loginPanel label {
+      display: block;
+      font-size: 12px;
+      color: #1d2140;
+      margin-bottom: 4px;
+    }
+    #loginPanel input {
+      width: 100%;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(27, 32, 64, 0.18);
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    #loginPanel button[type="submit"] {
+      width: 100%;
+      padding: 9px 0;
+      background: linear-gradient(135deg, #1f8efa, #3bc1ff);
+      border: none;
+      border-radius: 999px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(31, 142, 250, 0.35);
+    }
+    #loginPanel .error-message {
+      color: #d14343;
+      font-size: 12px;
+      margin-top: 6px;
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <div style="position:absolute;top:10px;right:10px;z-index:2000;background:rgba(255,255,255,0.95);padding:18px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);max-width:320px;">
+  <div id="topBar">
+    <div class="brand">Astroyd Meteor Madness</div>
+    <div id="authControls">
+      <span id="authStatus">Not signed in</span>
+      <button id="authActionButton">Login</button>
+    </div>
+  </div>
+  <div id="loginPanel">
+    <h4>Sign in</h4>
+    <form id="loginForm">
+      <label for="loginUsername">Username</label>
+      <input type="text" id="loginUsername" required>
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" required>
+      <button type="submit">Log in</button>
+      <div id="loginError" class="error-message"></div>
+    </form>
+  </div>
+  <div style="position:absolute;top:76px;right:10px;z-index:2000;background:rgba(255,255,255,0.95);padding:18px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);max-width:320px;">
     <div id="status" style="margin-bottom:10px;font-weight:bold;font-size:12px;">Connecting...</div>
     <form id="impactForm">
       <h3 style="margin-top:0">Asteroid Impact Settings</h3>
@@ -96,10 +211,14 @@
   <button type="submit" style="margin-top:10px;padding:8px 18px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer">Launch</button>
     </form>
   </div>
-  <div id="cesiumContainer"></div>
+  <div id="cesiumContainer" data-cesium-ion-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNDI5M2Q3Ni0yNGM2LTRjNzEtOTBlMS1lNjRjNzVkZTQ0ODIiLCJpZCI6MzQ3MTY0LCJpYXQiOjE3NTk1ODk1OTR9.r5nrMuoK9ht2bT6rLS4B_1IKqMoyIBNYHp1Th-ch_rk"></div>
   <button id="toggleButton">Toggle View</button>
   <!-- Launch button removed, now handled by form submit -->
   <button id="cameraToggleButton">Follow Asteroid</button>
+  <script>
+    window.CESIUM_ION_TOKEN =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNDI5M2Q3Ni0yNGM2LTRjNzEtOTBlMS1lNjRjNzVkZTQ0ODIiLCJpZCI6MzQ3MTY0LCJpYXQiOjE3NTk1ODk1OTR9.r5nrMuoK9ht2bT6rLS4B_1IKqMoyIBNYHp1Th-ch_rk';
+  </script>
   <script type="module">
     import { setupCesiumVisualization } from './cesium-visualization.js';
     import { MeteorMadnessAPI } from './api-client.js';
@@ -242,7 +361,135 @@
     });
 
     window.getImpactSettings = () => userImpactSettings;
-    
+
+    // Authentication UI
+    const AUTH_STORAGE_KEY = 'meteorMadnessAuth';
+    const authStatusEl = document.getElementById('authStatus');
+    const authActionButton = document.getElementById('authActionButton');
+    const loginPanel = document.getElementById('loginPanel');
+    const loginForm = document.getElementById('loginForm');
+    const loginError = document.getElementById('loginError');
+    let authState = { token: null, refreshToken: null, profile: null };
+
+    function setAuthStatus(text, isError = false) {
+      authStatusEl.textContent = text;
+      authStatusEl.style.color = isError ? '#ff6b6b' : '#bfc6ff';
+    }
+
+    function hideLoginPanel() {
+      loginPanel.style.display = 'none';
+      loginError.style.display = 'none';
+      loginError.textContent = '';
+      loginForm.reset();
+    }
+
+    function showLoginPanel() {
+      loginPanel.style.display = 'block';
+      loginError.style.display = 'none';
+      loginError.textContent = '';
+      document.getElementById('loginUsername').focus();
+    }
+
+    function persistAuthState() {
+      if (authState.token) {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+          token: authState.token,
+          refreshToken: authState.refreshToken
+        }));
+      } else {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
+    }
+
+    function updateAuthUI() {
+      if (authState.profile) {
+        authActionButton.textContent = 'Logout';
+        setAuthStatus(`Signed in as ${authState.profile.username}`);
+      } else {
+        authActionButton.textContent = 'Login';
+        setAuthStatus('Not signed in', true);
+      }
+    }
+
+    async function loadProfile() {
+      if (!authState.token) return;
+      try {
+        const profile = await api.getProfile(authState.token);
+        authState.profile = profile;
+        updateAuthUI();
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        authState.profile = null;
+        updateAuthUI();
+      }
+    }
+
+    authActionButton.addEventListener('click', async () => {
+      if (authState.token) {
+        try {
+          await api.logout(authState.token);
+        } catch (error) {
+          console.warn('Logout failed:', error);
+        }
+        authState = { token: null, refreshToken: null, profile: null };
+        persistAuthState();
+        updateAuthUI();
+      } else {
+        if (loginPanel.style.display === 'block') hideLoginPanel();
+        else showLoginPanel();
+      }
+    });
+
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      loginError.style.display = 'none';
+      loginError.textContent = '';
+      const submitButton = loginForm.querySelector('button[type="submit"]');
+      const originalText = submitButton.textContent;
+      submitButton.textContent = 'Signing in...';
+      submitButton.disabled = true;
+      try {
+        const username = document.getElementById('loginUsername').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const tokenResponse = await api.login(username, password);
+        authState = {
+          token: tokenResponse.access_token,
+          refreshToken: tokenResponse.refresh_token,
+          profile: null
+        };
+        persistAuthState();
+        await loadProfile();
+        hideLoginPanel();
+      } catch (error) {
+        loginError.textContent = error.message || 'Login failed. Please try again.';
+        loginError.style.display = 'block';
+      } finally {
+        submitButton.textContent = originalText;
+        submitButton.disabled = false;
+      }
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!loginPanel.contains(event.target) && event.target !== authActionButton) {
+        hideLoginPanel();
+      }
+    });
+
+    const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (storedAuth) {
+      try {
+        const parsed = JSON.parse(storedAuth);
+        authState.token = parsed.token;
+        authState.refreshToken = parsed.refreshToken;
+        loadProfile();
+      } catch (error) {
+        console.warn('Failed to parse stored auth state', error);
+        persistAuthState();
+      }
+    } else {
+      updateAuthUI();
+    }
+
     // Initialize
     checkBackendConnection();
     setupCesiumVisualization('cesiumContainer');

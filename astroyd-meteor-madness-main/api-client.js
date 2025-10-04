@@ -83,7 +83,7 @@ class MeteorMadnessAPI {
     async getSolutions() {
         try {
             const response = await fetch(`${this.baseURL}/simulation/solutions`);
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -134,7 +134,7 @@ class MeteorMadnessAPI {
     async getVersion() {
         try {
             const response = await fetch('http://localhost:8000/version');
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -142,6 +142,73 @@ class MeteorMadnessAPI {
             return await response.json();
         } catch (error) {
             console.error('Error fetching version:', error);
+            throw error;
+        }
+    }
+
+    async login(username, password) {
+        try {
+            const response = await fetch(`${this.baseURL}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const message = data?.detail || `Login failed with status ${response.status}`;
+                throw new Error(message);
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Error logging in:', error);
+            throw error;
+        }
+    }
+
+    async getProfile(accessToken) {
+        try {
+            const response = await fetch(`${this.baseURL}/auth/me`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const message = errorData?.detail || `Profile request failed with status ${response.status}`;
+                throw new Error(message);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+            throw error;
+        }
+    }
+
+    async logout(accessToken) {
+        try {
+            const response = await fetch(`${this.baseURL}/auth/logout`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const message = errorData?.detail || `Logout failed with status ${response.status}`;
+                throw new Error(message);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Error logging out:', error);
             throw error;
         }
     }
