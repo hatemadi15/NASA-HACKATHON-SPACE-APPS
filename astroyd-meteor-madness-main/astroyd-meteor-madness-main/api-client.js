@@ -1,5 +1,25 @@
 // API client for Meteor Madness backend
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const deriveApiBaseUrl = () => {
+    if (typeof window === 'undefined') {
+        return 'http://localhost:8000/api/v1';
+    }
+
+    const override = window.__METEOR_MADNESS_API__?.baseUrl;
+    if (override) {
+        return override.replace(/\/$/, '');
+    }
+
+    const { protocol, hostname, port } = window.location;
+
+    if (port === '4173') {
+        return `${protocol}//${hostname}:8000/api/v1`;
+    }
+
+    const portSegment = port ? `:${port}` : '';
+    return `${protocol}//${hostname}${portSegment}/api/v1`;
+};
+
+const API_BASE_URL = deriveApiBaseUrl();
 
 class MeteorMadnessAPI {
     constructor() {

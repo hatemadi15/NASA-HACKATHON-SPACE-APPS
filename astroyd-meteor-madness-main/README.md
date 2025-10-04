@@ -40,12 +40,13 @@ cp env.example .env
 uvicorn app.main:app --reload
 ```
 
-4. Serve the frontend bundle (in a separate shell):
-```bash
-uvicorn app.frontend:app --host 0.0.0.0 --port 4173
-```
-
-Visit `http://127.0.0.1:4173` in your browser to use the simulator UI. The frontend is configured to call the API at `http://localhost:8000` by default.
+4. Serve the frontend:
+   - **Easiest:** the API process now exposes the UI at `/ui`, so once the backend is running you can browse to `http://127.0.0.1:8000/ui/`.
+   - **Optional standalone host:**
+     ```bash
+     uvicorn app.frontend:app --host 0.0.0.0 --port 4173
+     ```
+     The JavaScript client auto-detects the backend URL, so you can open `http://127.0.0.1:4173/` without editing any configuration.
 
 ### Environment Variables
 
