@@ -35,10 +35,17 @@ cp env.example .env
 # echo "NASA_API_KEY=YOUR_KEY" >> .env.local
 ```
 
-3. Run the application:
+3. Run the backend API:
 ```bash
 uvicorn app.main:app --reload
 ```
+
+4. Serve the frontend bundle (in a separate shell):
+```bash
+uvicorn app.frontend:app --host 0.0.0.0 --port 4173
+```
+
+Visit `http://127.0.0.1:4173` in your browser to use the simulator UI. The frontend is configured to call the API at `http://localhost:8000` by default.
 
 ### Environment Variables
 
