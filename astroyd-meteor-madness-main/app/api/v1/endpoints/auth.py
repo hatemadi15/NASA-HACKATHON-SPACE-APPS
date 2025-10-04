@@ -11,7 +11,7 @@ from pydantic import BaseModel, EmailStr
 import logging
 
 from app.core.database import get_db
-from app.core.models import User, UserSession, SystemLog
+from app.core.models import User, UserSession, Simulation, DeflectionGameScoreDB, SimulationExport
 from app.core.auth import (
     authenticate_user, create_access_token, create_refresh_token,
     get_password_hash, verify_token, get_current_user, get_current_active_user,
@@ -58,6 +58,29 @@ class UserProfile(BaseModel):
     game_scores_count: int
     exports_count: int
     created_at: datetime
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.get("/me", response_model=UserProfile)
+async def get_profile(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Return the authenticated user's profile and usage counts."""
+
+    simulations_count = db.query(Simulation).filter(Simulation.user_id == current_user.id).count()
+    game_scores_count = db.query(DeflectionGameScoreDB).filter(DeflectionGameScoreDB.user_id == current_user.id).count()
+    exports_count = db.query(SimulationExport).filter(SimulationExport.user_id == current_user.id).count()
+
+    return UserProfile(
+        username=current_user.username,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        simulations_count=simulations_count,
+        game_scores_count=game_scores_count,
+        exports_count=exports_count,
+        created_at=current_user.created_at,
+    )
 
 @router.post("/register", response_model=UserResponse)
 async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -158,19 +181,19 @@ async def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    refresh_token: str,
+    payload: RefreshRequest,
     db: Session = Depends(get_db)
 ):
     """Refresh access token using refresh token"""
     try:
-        payload = verify_token(refresh_token)
-        if not payload or payload.get("type") != "refresh":
+        token_payload = verify_token(payload.refresh_token)
+        if not token_payload or token_payload.get("type") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid refresh token"
             )
-        
-        username = payload.get("sub")
+
+        username = token_payload.get("sub")
         if not username:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -201,35 +224,6 @@ async def refresh_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Token refresh failed"
-        )
-
-@router.get("/me", response_model=UserProfile)
-async def get_current_user_profile(
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Get current user profile with statistics"""
-    try:
-        # Get user statistics
-        simulations_count = len(current_user.simulations)
-        game_scores_count = len(current_user.game_scores)
-        exports_count = len(current_user.exports)
-        
-        return UserProfile(
-            username=current_user.username,
-            email=current_user.email,
-            full_name=current_user.full_name,
-            simulations_count=simulations_count,
-            game_scores_count=game_scores_count,
-            exports_count=exports_count,
-            created_at=current_user.created_at
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to get user profile: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get user profile"
         )
 
 @router.put("/me", response_model=UserResponse)

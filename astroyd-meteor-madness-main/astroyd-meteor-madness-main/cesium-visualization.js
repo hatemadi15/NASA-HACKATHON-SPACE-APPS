@@ -456,7 +456,10 @@ function runCesium(containerId) {
       }
     });
   }
-  document.getElementById('launchButton').addEventListener('click', resetSimulation);
+  const launchButton = document.getElementById('launchButton');
+  if (launchButton) {
+    launchButton.addEventListener('click', resetSimulation);
+  }
   // Initial setup
   // resetSimulation(); // Remove this line so asteroid only launches on button click
 }

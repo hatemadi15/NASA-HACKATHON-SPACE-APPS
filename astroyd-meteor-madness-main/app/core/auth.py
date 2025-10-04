@@ -6,8 +6,9 @@ from datetime import datetime, timedelta
 from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
@@ -101,8 +102,33 @@ def get_current_user(
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
-    
+
     return user
+
+
+def get_current_user_optional(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Return the authenticated user if a valid bearer token is supplied."""
+
+    authorization: str | None = request.headers.get("Authorization")
+    if not authorization:
+        return None
+
+    scheme, token = get_authorization_scheme_param(authorization)
+    if not token or scheme.lower() != "bearer":
+        return None
+
+    payload = verify_token(token)
+    if not payload or payload.get("type") != "access":
+        return None
+
+    username: str | None = payload.get("sub")
+    if not username:
+        return None
+
+    return db.query(User).filter(User.username == username).first()
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """Get current active user"""
