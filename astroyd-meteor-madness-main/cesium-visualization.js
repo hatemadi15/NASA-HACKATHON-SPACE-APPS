@@ -13,12 +13,43 @@ export function setupCesiumVisualization(containerId) {
 function runCesium(containerId) {
   try {
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1ZGMyMzExNS0yMDA3LTQzOTUtYWI4Zi01MTE1NDVkZjA5MmQiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODkyMjB9.mKL-h_yoK40tAU5y0x366QdYPvh_Gb1-slJDDoY-Atk';
-      const viewer = new Cesium.Viewer(containerId, {
+    // Cesium visualization logic for meteor impact simulator
+// Handles all DOM elements and events
+
+export function setupCesiumVisualization(containerId) {
+  // Wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => runCesium(containerId));
+  } else {
+    runCesium(containerId);
+  }
+}
+
+function runCesium(containerId) {
+  try {
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1ZGMyMzExNS0yMDA3LTQzOTUtYWI4Zi01MTE1NDVkZjA5MmQiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODkyMjB9.mKL-h_yoK40tAU5y0x366QdYPvh_Gb1-slJDDoY-Atk';
+    const viewer = new Cesium.Viewer(containerId, {
       terrain: Cesium.Terrain.fromWorldTerrain(),
       baseLayerPicker: false
     });
 
     viewer.infoBox.frame.sandbox = "allow-same-origin allow-top-navigation allow-pointer-lock allow-popups allow-forms allow-scripts";
+    const viewer = new Cesium.Viewer(containerId, {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+      baseLayerPicker: false
+    });
+
+    viewer.infoBox.frame.sandbox = "allow-same-origin allow-top-navigation allow-pointer-lock allow-popups allow-forms allow-scripts";
+
+    const NASA_API_KEY = window.NASA_API_KEY || 'DEMO_KEY';
+    const NEO_API_URL = 'https://api.nasa.gov/neo/rest/v1/feed';
+    const DEG2RAD = Math.PI / 180;
+    const TWO_PI = Math.PI * 2;
+    const AU_IN_METERS = 149597870700;
+    const SOLAR_GM = 1.32712440018e20; // m^3/s^2
+    const SECONDS_PER_DAY = 86400;
+    const EARTH_RADIUS_METERS = 6378137;
+    const EARTH_OBLIQUITY = Cesium.Math.toRadians(23.439281);
 
     const NASA_API_KEY = window.NASA_API_KEY || 'DEMO_KEY';
     const NEO_API_URL = 'https://api.nasa.gov/neo/rest/v1/feed';
@@ -222,14 +253,6 @@ function runCesium(containerId) {
       };
     };
 
-    const state = {
-      activeAnimations: new Set(),
-      visualizationEntities: new Set(),
-      craterEntities: new Set(),
-      isShowingCrater: false
-    };
-
-    let currentSimulation = normalizeSimulationPayload(window.getImpactSettings ? window.getImpactSettings() : null);
     const state = {
       activeAnimations: new Set(),
       visualizationEntities: new Set(),
@@ -931,4 +954,5 @@ function runCesium(containerId) {
     }
   }
 }
+
 
