@@ -456,7 +456,8 @@
         data: '648m carbonaceous asteroid on a Mars-skimming trajectory redirected toward Earth.',
         baseDamage: 780000,
         requiredPower: 120,
-        impactLocation: { latitude: 15.4, longitude: -74.6, elevation: 0 }
+        impactLocation: { latitude: 15.4, longitude: -74.6, elevation: 0 },
+        approachVector: { latitude: 9.2, longitude: -94.8, altitude: 520000 }
       },
       {
         id: 'aurora-borealis',
@@ -466,7 +467,8 @@
         data: '392m iron-rich body entering at a polar inclination with high entry speed.',
         baseDamage: 520000,
         requiredPower: 85,
-        impactLocation: { latitude: 69.6, longitude: -96.8, elevation: 0 }
+        impactLocation: { latitude: 69.6, longitude: -96.8, elevation: 0 },
+        approachVector: { latitude: 80.4, longitude: -124.3, altitude: 610000 }
       },
       {
         id: 'pacific-guardian',
@@ -476,7 +478,8 @@
         data: '190m stony asteroid projected to impact the northern Pacific shipping lanes.',
         baseDamage: 260000,
         requiredPower: 55,
-        impactLocation: { latitude: 24.5, longitude: -151.6, elevation: 0 }
+        impactLocation: { latitude: 24.5, longitude: -151.6, elevation: 0 },
+        approachVector: { latitude: 32.8, longitude: -175.2, altitude: 430000 }
       }
     ];
 
@@ -559,6 +562,8 @@
     const leaderboardBody = document.getElementById('leaderboardBody');
     const leaderboardStatus = document.getElementById('leaderboardStatus');
 
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
     function formatCredits(value) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value * 1000);
     }
@@ -577,6 +582,12 @@
       }
       if (Number.isFinite(entry?.efficiency)) {
         parts.push(`${entry.efficiency}% eff.`);
+      }
+      if (Number.isFinite(entry?.successRate)) {
+        parts.push(`${Math.round(entry.successRate * 100)}% intercept rate`);
+      }
+      if (Number.isFinite(entry?.gamesPlayed)) {
+        parts.push(`${entry.gamesPlayed} runs`);
       }
       return parts.length ? parts.join(' · ') : '—';
     }
@@ -600,17 +611,23 @@
       }
       const commander = entry.player_name || entry.username || entry.commander || entry.full_name || `Commander ${index + 1}`;
       const mission = entry.mission || entry.level || entry.level_name || entry.difficulty_level || entry.target || entry.scenario || '—';
-      const method = entry.deflection_method || entry.method || entry.strategy || '—';
-      const rawScore = Number.parseFloat(entry.score);
+      const methodSource = entry.deflection_method || entry.favorite_method || entry.method || entry.strategy;
+      const method = methodSource || '—';
+      const rawScore = Number.parseFloat(entry.score ?? entry.best_score);
       const score = Number.isFinite(rawScore) ? rawScore : null;
       const efficiencySource = entry.efficiency ?? entry.cost_efficiency ?? entry.success_rate;
       let efficiency = null;
       if (Number.isFinite(efficiencySource)) {
         efficiency = Math.round(efficiencySource * (efficiencySource <= 1 ? 100 : 1));
       }
-      const outcome = entry.outcome
+      let outcome = entry.outcome
         || (typeof entry.success === 'boolean' ? (entry.success ? 'Success' : 'Failed') : null)
         || (typeof entry.success_rate === 'number' ? `${Math.round(entry.success_rate * 100)}% success` : null);
+
+      const gamesPlayed = Number.isFinite(entry.games_played) ? entry.games_played : (Number.isFinite(entry.games) ? entry.games : null);
+      if (gamesPlayed === 0 && !outcome) {
+        outcome = 'Awaiting first run';
+      }
 
       return {
         commander,
@@ -619,6 +636,9 @@
         score,
         efficiency,
         outcome,
+        rank: Number.isFinite(entry.rank) ? entry.rank : null,
+        gamesPlayed,
+        successRate: Number.isFinite(entry.success_rate) ? entry.success_rate : null,
         raw: entry
       };
     }
@@ -627,7 +647,16 @@
       const normalized = entries
         .filter(Boolean)
         .map(entry => ({ ...entry }))
-        .sort((a, b) => getComparableScore(b) - getComparableScore(a));
+        .sort((a, b) => {
+          const rankA = Number.isFinite(a.rank) ? a.rank : null;
+          const rankB = Number.isFinite(b.rank) ? b.rank : null;
+          if (rankA !== null && rankB !== null) {
+            return rankA - rankB;
+          }
+          if (rankA !== null) return -1;
+          if (rankB !== null) return 1;
+          return getComparableScore(b) - getComparableScore(a);
+        });
       leaderboard.length = 0;
       normalized.forEach(entry => leaderboard.push(entry));
       currentLeaderboard = [...leaderboard];
@@ -692,14 +721,15 @@
       }));
     }
 
-    function buildDefensePlan(level, stats) {
+    function buildDefensePlan(level, stats, engagement) {
       return {
         timestamp: Date.now(),
         level: level ? {
           id: level.id,
           name: level.name,
           difficulty: level.difficulty,
-          impactLocation: level.impactLocation || null
+          impactLocation: level.impactLocation || null,
+          approachVector: level.approachVector || null
         } : null,
         loadout: buildLoadoutSnapshot(),
         totals: {
@@ -709,8 +739,11 @@
           creditsSpent: state.initialCredits - state.credits,
           missionCost: stats.spent,
           damagePrevented: stats.prevented,
-          efficiency: stats.efficiency
-        }
+          efficiency: stats.efficiency,
+          accuracy: stats.accuracy,
+          success: Boolean(stats.success)
+        },
+        engagement: engagement || null
       };
     }
 
@@ -964,8 +997,12 @@
           scoreText = `${entry.efficiency}%`;
         }
         const outcomeText = mergeOutcomeText(entry);
+        const hasComparableScore = Number.isFinite(entry.score) || Number.isFinite(entry.efficiency);
+        const rankDisplay = Number.isFinite(entry.rank)
+          ? entry.rank
+          : (entry.commander === 'You' ? (idx + 1) : (hasComparableScore ? idx + 1 : '—'));
         row.innerHTML = `
-          <td>${idx + 1}</td>
+          <td>${rankDisplay}</td>
           <td>${entry.commander}</td>
           <td>${scoreText}</td>
           <td>${entry.method ?? '—'}</td>
@@ -976,23 +1013,75 @@
       });
     }
 
+    function computeEngagement(level, totals) {
+      const impact = level.impactLocation || { latitude: 0, longitude: 0, elevation: 0 };
+      const approach = level.approachVector || {
+        latitude: clamp(impact.latitude + 8, -80, 80),
+        longitude: impact.longitude - 18,
+        altitude: 480000
+      };
+      const interceptBlend = totals.success ? 0.58 : 0.72;
+      const interceptLat = approach.latitude + (impact.latitude - approach.latitude) * interceptBlend;
+      const interceptLon = approach.longitude + (impact.longitude - approach.longitude) * interceptBlend;
+      const interceptAlt = clamp(approach.altitude * 0.68, 160000, 680000);
+      const interceptPoint = {
+        latitude: clamp(interceptLat, -85, 85),
+        longitude: interceptLon,
+        altitude: interceptAlt
+      };
+      const missPoint = {
+        latitude: clamp(interceptPoint.latitude - 2.4, -85, 85),
+        longitude: interceptPoint.longitude + 6,
+        altitude: clamp(interceptPoint.altitude * 0.75, 80000, 420000)
+      };
+      const deflectionPoint = {
+        latitude: clamp(interceptPoint.latitude + 3.2, -85, 85),
+        longitude: interceptPoint.longitude + 4.5,
+        altitude: clamp(interceptPoint.altitude + 190000, 200000, 780000)
+      };
+      const accuracyDisplay = Number.isFinite(totals.accuracy) ? Math.round(totals.accuracy) : null;
+      const summary = totals.success
+        ? `Defense intercept succeeded with${accuracyDisplay !== null ? ` ${accuracyDisplay}%` : ''} accuracy.`
+        : `Defense window missed — accuracy${accuracyDisplay !== null ? ` ${accuracyDisplay}%` : ''} below required threshold.`;
+      return {
+        approachPoint: approach,
+        interceptPoint,
+        missPoint,
+        deflectionPoint,
+        success: totals.success,
+        accuracy: totals.accuracy,
+        summary,
+        outcome: totals.success ? 'intercepted' : 'missed'
+      };
+    }
+
     function runSimulation() {
       if (!state.selectedLevel) return;
       const level = state.selectedLevel;
       const totalPower = getTotalPower();
-      const mitigationRatio = Math.min(totalPower / level.requiredPower, 1.35);
-      const prevented = Math.round(level.baseDamage * mitigationRatio);
+      const powerRatio = totalPower / Math.max(level.requiredPower, 1);
+      const mitigationRatio = Math.min(powerRatio, 1.4);
+      const accuracyBase = clamp(powerRatio * 62, 6, 92);
+      const synergyBonus = clamp(state.loadout.size * 4.5, 0, 18);
+      const randomness = Math.random() * 18 - 6;
+      const accuracy = clamp(Math.round(accuracyBase + synergyBonus + randomness), 0, 100);
+      const success = accuracy >= 20;
+      const prevented = success
+        ? Math.round(level.baseDamage * mitigationRatio * (accuracy / 100))
+        : 0;
       const creditsSpent = Math.max(0, state.initialCredits - state.credits);
       const spent = creditsSpent * 1000;
       const efficiency = spent > 0 ? Math.round((prevented / spent) * 100) : 0;
 
-      damagePreventedEl.textContent = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(prevented) + ' lives saved';
+      damagePreventedEl.textContent = success
+        ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(prevented) + ' lives saved'
+        : 'Defense failed — impact imminent';
       missionCostEl.textContent = formatCredits(creditsSpent);
       costEfficiencyEl.textContent = efficiency ? `${efficiency} %` : '—';
 
-      const outcomeBase = spent === 0
-        ? 'Training Run'
-        : (efficiency >= 100 ? 'Success' : (efficiency > 0 ? 'Partial' : 'Needs Review'));
+      const outcomeBase = !success
+        ? 'Defense Failed'
+        : (efficiency >= 120 ? 'Intercept Success' : (efficiency > 0 ? 'Intercept Partial' : 'Intercept Logged'));
 
       const simulatedEntry = {
         commander: 'You',
@@ -1000,7 +1089,10 @@
         method: 'Custom Loadout',
         score: prevented,
         efficiency,
-        outcome: outcomeBase
+        outcome: `${outcomeBase} · Accuracy ${accuracy}%`,
+        gamesPlayed: 1,
+        successRate: success ? 1 : 0,
+        success
       };
 
       const baseEntries = leaderboard.filter(entry => entry.commander !== 'You');
@@ -1012,7 +1104,8 @@
       const simulatedRank = currentLeaderboard.findIndex(entry => entry.commander === 'You');
       leaderboardRankEl.textContent = simulatedRank >= 0 ? '#' + (simulatedRank + 1) : '—';
 
-      const defensePlan = buildDefensePlan(level, { prevented, spent, efficiency, totalPower });
+      const engagement = computeEngagement(level, { accuracy, success });
+      const defensePlan = buildDefensePlan(level, { prevented, spent, efficiency, totalPower, accuracy, success }, engagement);
       syncDefensePlan(defensePlan);
 
       if (leaderboardStatus) {

@@ -4,6 +4,7 @@ Enhanced simulation API endpoints with trajectory, zones, and deflection game
 
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any, Optional
+from collections import defaultdict
 from pydantic import BaseModel
 import uuid
 import math
@@ -443,32 +444,138 @@ async def submit_deflection_score(
 
 @router.get("/deflection-game/leaderboard")
 async def get_deflection_leaderboard(
-    limit: int = 10,
+    limit: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
     """Get deflection game leaderboard"""
     try:
-        scores = db.query(DeflectionGameScore).order_by(
-            DeflectionGameScore.score.desc()
-        ).limit(limit).all()
-        
+        users = db.query(User).order_by(User.username).all()
+        scores = db.query(DeflectionGameScoreDB).all()
+
+        scores_by_user: Dict[int, List[DeflectionGameScoreDB]] = defaultdict(list)
+        guest_scores: Dict[str, List[DeflectionGameScoreDB]] = defaultdict(list)
+
+        for score in scores:
+            if score.user_id:
+                scores_by_user[score.user_id].append(score)
+            else:
+                guest_scores[score.player_name].append(score)
+
+        leaderboard_entries: List[Dict[str, Any]] = []
+        ranked_candidates: List[Dict[str, Any]] = []
+
+        for user in users:
+            user_scores = scores_by_user.get(user.id, [])
+            games_played = len(user_scores)
+            best_score = max((entry.score for entry in user_scores), default=None)
+            success_rate = (
+                sum(1 for entry in user_scores if entry.success) / games_played
+                if games_played
+                else None
+            )
+            favorite_method = None
+            last_played = None
+            if user_scores:
+                top_entry = max(
+                    user_scores,
+                    key=lambda entry: (entry.score, entry.created_at or datetime.utcnow())
+                )
+                favorite_method = top_entry.deflection_method
+                last_played = max(
+                    (entry.created_at for entry in user_scores if entry.created_at),
+                    default=None
+                )
+
+            entry_payload: Dict[str, Any] = {
+                "player_name": user.full_name or user.username,
+                "username": user.username,
+                "score": best_score,
+                "best_score": best_score,
+                "games_played": games_played,
+                "success_rate": success_rate,
+                "deflection_method": favorite_method,
+                "last_played": last_played.isoformat() if last_played else None,
+            }
+
+            if games_played:
+                ranked_candidates.append(entry_payload)
+            leaderboard_entries.append(entry_payload)
+
+        for guest_name, guest_runs in guest_scores.items():
+            games_played = len(guest_runs)
+            if games_played == 0:
+                continue
+            best_score = max(entry.score for entry in guest_runs)
+            success_rate = sum(1 for entry in guest_runs if entry.success) / games_played
+            favorite_method = max(
+                guest_runs,
+                key=lambda entry: (entry.score, entry.created_at or datetime.utcnow())
+            ).deflection_method
+            last_played = max(
+                (entry.created_at for entry in guest_runs if entry.created_at),
+                default=None
+            )
+            guest_entry: Dict[str, Any] = {
+                "player_name": guest_name,
+                "username": guest_name,
+                "score": best_score,
+                "best_score": best_score,
+                "games_played": games_played,
+                "success_rate": success_rate,
+                "deflection_method": favorite_method,
+                "last_played": last_played.isoformat() if last_played else None,
+            }
+            ranked_candidates.append(guest_entry)
+            leaderboard_entries.append(guest_entry)
+
+        ranked_candidates.sort(
+            key=lambda entry: (
+                -(entry["best_score"] or 0),
+                entry.get("player_name") or ""
+            )
+        )
+
+        last_score = None
+        current_rank = 0
+        ties_at_rank = 0
+        for candidate in ranked_candidates:
+            candidate_score = candidate.get("best_score") or 0
+            if last_score is None or candidate_score < last_score:
+                current_rank += 1 + ties_at_rank
+                ties_at_rank = 0
+                last_score = candidate_score
+            else:
+                ties_at_rank += 1
+            candidate["rank"] = current_rank
+
+        for entry in leaderboard_entries:
+            if entry.get("games_played"):
+                continue
+            entry["rank"] = None
+
+        leaderboard_entries.sort(
+            key=lambda entry: (
+                entry["rank"] if entry.get("rank") is not None else float("inf"),
+                -(entry.get("best_score") or 0),
+                entry.get("player_name") or ""
+            )
+        )
+
+        if limit is not None and limit > 0:
+            ranked_portion = [entry for entry in leaderboard_entries if entry.get("rank") is not None]
+            unranked_portion = [entry for entry in leaderboard_entries if entry.get("rank") is None]
+            trimmed_ranked = ranked_portion[:limit]
+            leaderboard_payload = trimmed_ranked + unranked_portion
+        else:
+            leaderboard_payload = leaderboard_entries
+
         return {
-            "leaderboard": [
-                {
-                    "id": score.id,
-                    "player_name": score.player_name,
-                    "score": score.score,
-                    "asteroid_mass": score.asteroid_mass,
-                    "deflection_method": score.deflection_method,
-                    "success": score.success,
-                    "created_at": score.created_at.isoformat()
-                }
-                for score in scores
-            ],
-            "total_players": db.query(DeflectionGameScore).count()
+            "leaderboard": leaderboard_payload,
+            "total_players": len(users)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get leaderboard: {str(e)}")
+
 
 @router.get("/solutions")
 async def get_mitigation_solutions():
