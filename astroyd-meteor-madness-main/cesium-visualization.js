@@ -185,6 +185,7 @@ function runCesium(containerId) {
     let asteroidEntity = null;
     let pendingDefenseAutoFollow = false;
     let defenseOverlayEnabled = Boolean(window.defenseOverlayEnabled);
+    let latestImpactSelectionId = 0;
 
     const defenseColors = {
       lasers: Cesium.Color.fromCssColorString('#7b1fa2'),
@@ -288,6 +289,8 @@ function runCesium(containerId) {
       if (!cartographic) {
         return;
       }
+      latestImpactSelectionId += 1;
+      const selectionId = latestImpactSelectionId;
       const latitude = Cesium.Math.toDegrees(cartographic.latitude);
       const longitude = Cesium.Math.toDegrees(cartographic.longitude);
       const elevation = cartographic.height ?? 0;
@@ -321,6 +324,10 @@ function runCesium(containerId) {
       if (elevationInput) {
         elevationInput.value = elevation.toFixed(2);
       }
+      const populationDensityInput = document.getElementById('population_density');
+      if (populationDensityInput) {
+        populationDensityInput.value = '';
+      }
       try {
         if (window?.meteorMadnessAPI?.getPopulationDensity) {
           const fetchedDensity = await window.meteorMadnessAPI.getPopulationDensity(latitude, longitude);
@@ -331,13 +338,16 @@ function runCesium(containerId) {
       } catch (error) {
         console.warn('Failed to fetch population density for selected impact location', error);
       }
+       if (selectionId !== latestImpactSelectionId) {
+        return;
+      }
+
 
       impact_location = {
         ...impact_location,
         population_density: populationDensity
       };
 
-      const populationDensityInput = document.getElementById('population_density');
       if (populationDensityInput) {
         populationDensityInput.value = String(Math.round(populationDensity * 100) / 100);
       }
