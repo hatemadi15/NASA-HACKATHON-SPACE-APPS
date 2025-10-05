@@ -284,7 +284,7 @@ function runCesium(containerId) {
       return Cesium.defined(pickedPosition) ? pickedPosition : null;
     };
 
-    const applyManualImpactSelection = (cartographic) => {
+    const applyManualImpactSelection = async (cartographic) => {
       if (!cartographic) {
         return;
       }
@@ -296,11 +296,14 @@ function runCesium(containerId) {
         return;
       }
 
+      let populationDensity = 0;
+
       impact_location = {
         ...impact_location,
         latitude,
         longitude,
-        elevation
+        elevation,
+        population_density: populationDensity
       };
 
       impactCartesian = Cesium.Cartesian3.fromDegrees(longitude, latitude, elevation);
@@ -318,6 +321,27 @@ function runCesium(containerId) {
       if (elevationInput) {
         elevationInput.value = elevation.toFixed(2);
       }
+      try {
+        if (window?.meteorMadnessAPI?.getPopulationDensity) {
+          const fetchedDensity = await window.meteorMadnessAPI.getPopulationDensity(latitude, longitude);
+          if (typeof fetchedDensity === 'number' && Number.isFinite(fetchedDensity)) {
+            populationDensity = fetchedDensity;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch population density for selected impact location', error);
+      }
+
+      impact_location = {
+        ...impact_location,
+        population_density: populationDensity
+      };
+
+      const populationDensityInput = document.getElementById('population_density');
+      if (populationDensityInput) {
+        populationDensityInput.value = String(Math.round(populationDensity * 100) / 100);
+      }
+
 
       const updatedSimulation = {
         ...currentSimulation,
@@ -325,7 +349,8 @@ function runCesium(containerId) {
           ...currentSimulation.location,
           latitude,
           longitude,
-          elevation
+          elevation,
+          population_density: populationDensity
         }
       };
 
