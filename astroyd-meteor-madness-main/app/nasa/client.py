@@ -224,27 +224,77 @@ class NASAClient:
 			return {}
 
 	async def get_population_data(self, lat: float, lon: float) -> Dict[str, Any]:
-		"""Get population density from SEDAC GPWv4 (placeholder; token-ready)"""
+		"""Get population density from SEDAC GPWv4 population-density service."""
 		try:
 			cache_key = f"pop:{round(lat,3)}:{round(lon,3)}"
 			cached = self._cache_get(cache_key)
 			if cached is not None:
 				return cached
-			headers = self._earthdata_headers()
-			# Demo heuristic: higher density near urban-like lat/lon bands
-			base_density = 50.0
-			if abs(lat) < 30:
-				base_density = 200.0
-			elif abs(lat) < 50:
-				base_density = 120.0
-			data = {"latitude": lat, "longitude": lon, "population_density": base_density, "total_population": int(base_density * 1000), "urban_percentage": 0.6, "data_year": 2020}
-			self._cache_set(cache_key, data)
-			return data
+
+			params = {
+				"f": "json",
+				"geometry": f"{lon},{lat}",
+				"geometryType": "esriGeometryPoint",
+				"inSR": 4326,
+				"spatialRel": "esriSpatialRelIntersects",
+				"outFields": "Data_Value",
+				"returnGeometry": "false",
+			}
+			if self.earthdata_token:
+				params["token"] = self.earthdata_token
+
+			url = (
+				"https://sedac.ciesin.columbia.edu/arcgis/rest/services/"
+				"sedac/gpw-v4-population-density_2020/data/MapServer/0/query"
+			)
+
+			async with httpx.AsyncClient(timeout=15.0) as client:
+				response = await client.get(url, params=params)
+				response.raise_for_status()
+				payload = response.json()
+
+			features = payload.get("features", []) if isinstance(payload, dict) else []
+			if not features:
+				logger.warning(
+					"GPWv4 population-density query returned no features for lat=%s lon=%s",
+					lat,
+					lon,
+				)
+			else:
+				attributes = features[0].get("attributes") or {}
+				data_value = attributes.get("Data_Value")
+				if data_value is not None:
+					density = float(data_value)
+					data = {
+						"latitude": lat,
+						"longitude": lon,
+						"population_density": density,
+						"total_population": int(density * 1000),
+						"urban_percentage": 0.6,
+						"data_year": 2020,
+						"data_source": "SEDAC GPWv4 Population Density (2020)",
+						"units": "people per square kilometer",
+					}
+					self._cache_set(cache_key, data)
+					return data
+				else:
+					logger.warning(
+						"GPWv4 response missing Data_Value for lat=%s lon=%s",
+						lat,
+						lon,
+					)
 		except Exception as e:
 			logger.error(f"Error fetching population data: {e}")
-			if self._demo_fallback:
-				return {"latitude": lat, "longitude": lon, "population_density": 100.0, "total_population": 10000, "urban_percentage": 0.8, "data_year": 2020}
-			return {}
+		if self._demo_fallback:
+			return {
+				"latitude": lat,
+				"longitude": lon,
+				"population_density": 100.0,
+				"total_population": 10000,
+				"urban_percentage": 0.8,
+				"data_year": 2020,
+			}
+		return {}
 
 	async def get_terrain_data(self, lat: float, lon: float) -> Dict[str, Any]:
 		"""Get elevation/terrain (placeholder; will use NASADEM/SRTM with token when enabled)"""
