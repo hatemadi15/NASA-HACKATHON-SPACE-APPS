@@ -215,6 +215,19 @@ function runCesium(containerId) {
       createDangerZones();
     });
 
+    window.addEventListener('advancedImpactCalculated', (event) => {
+      const detail = event?.detail;
+      if (detail?.settingsDispatched) {
+        return;
+      }
+      if (detail?.simulation) {
+        applySimulationState(detail.simulation);
+      } else {
+        applySimulationState(window.getImpactSettings ? window.getImpactSettings() : null);
+      }
+      createDangerZones();
+    });
+
     const neoToggleButton = document.getElementById('neoToggleButton');
     const neoListContainer = document.getElementById('neoListContainer');
     const neoList = document.getElementById('neoList');
