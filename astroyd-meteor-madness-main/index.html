@@ -172,6 +172,84 @@
     #historyTable th {
         background-color: #f2f2f2;
     }
+
+    #impactForm {
+      font-size: 13px;
+    }
+
+    .settings-tabs {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0 16px;
+    }
+
+    .settings-tab {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      background: rgba(42, 42, 42, 0.12);
+      color: #2a2a2a;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .settings-tab:hover:not(.active) {
+      background: rgba(42, 42, 42, 0.18);
+    }
+
+    .settings-tab.active {
+      background: rgba(42, 42, 42, 0.85);
+      color: #ffffff;
+    }
+
+    .settings-tab:focus-visible {
+      outline: 2px solid rgba(42, 42, 42, 0.85);
+      outline-offset: 2px;
+    }
+
+    .settings-page {
+      display: none;
+    }
+
+    .settings-page.active {
+      display: block;
+    }
+
+    .field-group {
+      margin-bottom: 14px;
+    }
+
+    .field-group h4 {
+      margin: 0 0 8px;
+      font-size: 13px;
+    }
+
+    .advanced-checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .advanced-checkbox-grid label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .advanced-results {
+      margin-top: 12px;
+      font-size: 12px;
+      display: none;
+      background: rgba(0, 0, 0, 0.03);
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -237,86 +315,114 @@
     </div>
     <form id="impactForm">
       <h3 style="margin-top:0">Asteroid Impact Settings</h3>
-      <label for="asteroid-focus">Focus on:</label>
-      <select id="asteroid-focus" name="asteroid-focus" style="width:150px;margin-bottom:8px">
-        <option value="earth">Earth</option>
-      </select><br>
-
-      <label for="latitude">Latitude:</label>
-      <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
-      <label for="longitude">Longitude:</label>
-      <input type="number" id="longitude" name="longitude" step="0.01" value="35.5018" style="width:80px;margin-bottom:8px"><br>
-      <label for="elevation">Elevation (m):</label>
-      <input type="number" id="elevation" name="elevation" step="1" value="0" style="width:80px;margin-bottom:8px"><br>
-      <label for="terrain_type">Terrain Type:</label>
-      <select id="terrain_type" name="terrain_type" style="width:90px;margin-bottom:8px">
-        <option value="ocean">Ocean</option>
-        <option value="land" selected>Land</option>
-        <option value="urban">Urban</option>
-        <option value="rural">Rural</option>
-        <option value="mountain">Mountain</option>
-        <option value="desert">Desert</option>
-        <option value="forest">Forest</option>
-        <option value="ice">Ice</option>
-      </select><br>
-      <label for="population_density">Population Density (per km²):</label>
-      <input type="number" id="population_density" name="population_density" step="1" value="1000" style="width:90px;margin-bottom:8px"><br>
-      <label for="infrastructure_density">Infrastructure Density (0-1):</label>
-      <input type="number" id="infrastructure_density" name="infrastructure_density" step="0.05" min="0" max="1" value="0.6" style="width:90px;margin-bottom:8px"><br>
-      <label for="water_depth">Water Depth (m):</label>
-      <input type="number" id="water_depth" name="water_depth" step="1" value="1000" style="width:90px;margin-bottom:8px"><br>
-      <label style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:13px;">
-        <input type="checkbox" id="use_ml_enhancer" checked>
-        <span>Use ML Enhancer</span>
-      </label>
-      <hr style="margin:12px 0">
-      <label for="asteroid_size">Asteroid Size (m):</label>
-      <input type="number" id="asteroid_size" name="asteroid_size" step="1" value="50" style="width:80px;margin-bottom:8px"><br>
-      <label for="asteroid_speed">Asteroid Speed (m/s):</label>
-      <input type="number" id="asteroid_speed" name="asteroid_speed" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
-      <label for="asteroid_mass">Asteroid Mass (kg):</label>
-      <input type="number" id="asteroid_mass" name="asteroid_mass" step="1" value="1000000" style="width:80px;margin-bottom:8px"><br>
-      <label for="asteroid_density">Asteroid Density (kg/m³):</label>
-      <input type="number" id="asteroid_density" name="asteroid_density" step="1" value="3000" style="width:80px;margin-bottom:8px"><br>
-      <label for="impact_angle">Impact Angle:</label>
-      <input type="number" id="impact_angle" name="impact_angle" step="1" value="45" style="width:80px;margin-bottom:8px"><br>
-      <label for="composition">Composition:</label>
-      <select id="composition" name="composition" style="width:90px;margin-bottom:8px">
-        <option value="iron">Iron</option>
-        <option value="stony" selected>Stony</option>
-        <option value="carbonaceous">Carbonaceous</option>
-        <option value="mixed">Mixed</option>
-      </select><br>
-      <hr style="margin:12px 0">
-      <label for="crater_diameter">Crater Diameter (m):</label>
-      <input type="number" id="crater_diameter" name="crater_diameter" step="1" value="1200" style="width:80px;margin-bottom:8px"><br>
-      <label for="blast_radius">Blast Radius (m):</label>
-      <input type="number" id="blast_radius" name="blast_radius" step="1" value="50000" style="width:80px;margin-bottom:8px"><br>
-      <label for="thermal_radius">Thermal Radius (m):</label>
-      <input type="number" id="thermal_radius" name="thermal_radius" step="1" value="80000" style="width:80px;margin-bottom:8px"><br>
-      <label for="fireball_radius">Fireball Radius (m):</label>
-      <input type="number" id="fireball_radius" name="fireball_radius" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
-      <label for="evacuation_radius">Evacuation Radius (m):</label>
-      <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px"><br>
-      <hr style="margin:12px 0">
-      <h4 style="margin-bottom:8px">Advanced Calculations</h4>
-      <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:6px;font-size:12px;">
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_human_casualties" checked> Human Casualties</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_infrastructure_damage" checked> Infrastructure Damage</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_environmental_impact" checked> Environmental Impact</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_economic_impact" checked> Economic Impact</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_damage_assessment" checked> Damage Summary</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_kinetic_energy" checked> Kinetic Energy</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_atmospheric_entry" checked> Atmospheric Entry</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_crater_formation" checked> Crater Formation</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_blast_effects" checked> Blast Effects</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_tsunami_effects" checked> Tsunami Effects</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_evacuation_radius" checked> Evacuation Radius</label>
-        <label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" id="calc_impact_result" checked> Impact Result</label>
+      <div class="settings-tabs" role="tablist" aria-label="Impact settings sections">
+        <button type="button" class="settings-tab active" data-page="basic" role="tab" aria-selected="true" aria-controls="settings-page-basic">Core Inputs</button>
+        <button type="button" class="settings-tab" data-page="advanced" role="tab" aria-selected="false" aria-controls="settings-page-advanced">Advanced Analysis</button>
       </div>
-      <button type="button" id="advancedCalcButton" style="margin-top:10px;width:100%;padding:8px;background:#2a2a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;">Calculate Advanced Metrics</button>
+
+      <div class="settings-page active" id="settings-page-basic" data-page="basic" role="tabpanel" aria-label="Core Inputs" aria-hidden="false">
+        <div class="field-group">
+          <h4>Impact Location</h4>
+          <label for="asteroid-focus">Focus on:</label>
+          <select id="asteroid-focus" name="asteroid-focus" style="width:150px;margin-bottom:8px">
+            <option value="earth">Earth</option>
+          </select><br>
+
+          <label for="latitude">Latitude:</label>
+          <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
+          <label for="longitude">Longitude:</label>
+          <input type="number" id="longitude" name="longitude" step="0.01" value="35.5018" style="width:80px;margin-bottom:8px"><br>
+          <label for="elevation">Elevation (m):</label>
+          <input type="number" id="elevation" name="elevation" step="1" value="0" style="width:80px;margin-bottom:8px"><br>
+          <label for="terrain_type">Terrain Type:</label>
+          <select id="terrain_type" name="terrain_type" style="width:90px;margin-bottom:8px">
+            <option value="ocean">Ocean</option>
+            <option value="land" selected>Land</option>
+            <option value="urban">Urban</option>
+            <option value="rural">Rural</option>
+            <option value="mountain">Mountain</option>
+            <option value="desert">Desert</option>
+            <option value="forest">Forest</option>
+            <option value="ice">Ice</option>
+          </select><br>
+          <label for="population_density">Population Density (per km²):</label>
+          <input type="number" id="population_density" name="population_density" step="1" value="1000" style="width:90px;margin-bottom:8px"><br>
+          <label for="infrastructure_density">Infrastructure Density (0-1):</label>
+          <input type="number" id="infrastructure_density" name="infrastructure_density" step="0.05" min="0" max="1" value="0.6" style="width:90px;margin-bottom:8px"><br>
+          <label for="water_depth">Water Depth (m):</label>
+          <input type="number" id="water_depth" name="water_depth" step="1" value="1000" style="width:90px;margin-bottom:8px">
+        </div>
+
+        <div class="field-group">
+          <h4>Asteroid Profile</h4>
+          <label for="asteroid_size">Asteroid Size (m):</label>
+          <input type="number" id="asteroid_size" name="asteroid_size" step="1" value="50" style="width:80px;margin-bottom:8px"><br>
+          <label for="asteroid_speed">Asteroid Speed (m/s):</label>
+          <input type="number" id="asteroid_speed" name="asteroid_speed" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+          <label for="asteroid_mass">Asteroid Mass (kg):</label>
+          <input type="number" id="asteroid_mass" name="asteroid_mass" step="1" value="1000000" style="width:80px;margin-bottom:8px"><br>
+          <label for="asteroid_density">Asteroid Density (kg/m³):</label>
+          <input type="number" id="asteroid_density" name="asteroid_density" step="1" value="3000" style="width:80px;margin-bottom:8px"><br>
+          <label for="impact_angle">Impact Angle:</label>
+          <input type="number" id="impact_angle" name="impact_angle" step="1" value="45" style="width:80px;margin-bottom:8px"><br>
+          <label for="composition">Composition:</label>
+          <select id="composition" name="composition" style="width:90px;margin-bottom:8px">
+            <option value="iron">Iron</option>
+            <option value="stony" selected>Stony</option>
+            <option value="carbonaceous">Carbonaceous</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <h4>Impact Footprint Overrides</h4>
+          <label for="crater_diameter">Crater Diameter (m):</label>
+          <input type="number" id="crater_diameter" name="crater_diameter" step="1" value="1200" style="width:80px;margin-bottom:8px"><br>
+          <label for="blast_radius">Blast Radius (m):</label>
+          <input type="number" id="blast_radius" name="blast_radius" step="1" value="50000" style="width:80px;margin-bottom:8px"><br>
+          <label for="thermal_radius">Thermal Radius (m):</label>
+          <input type="number" id="thermal_radius" name="thermal_radius" step="1" value="80000" style="width:80px;margin-bottom:8px"><br>
+          <label for="fireball_radius">Fireball Radius (m):</label>
+          <input type="number" id="fireball_radius" name="fireball_radius" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+          <label for="evacuation_radius">Evacuation Radius (m):</label>
+          <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px">
+        </div>
+      </div>
+
+      <div class="settings-page" id="settings-page-advanced" data-page="advanced" role="tabpanel" aria-label="Advanced Analysis" aria-hidden="true">
+        <div class="field-group">
+          <p style="margin:0 0 10px;line-height:1.4;">Tune advanced analysis options and request in-depth calculations for the current scenario.</p>
+        </div>
+
+        <div class="field-group">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+            <input type="checkbox" id="use_ml_enhancer" checked>
+            <span>Use ML Enhancer</span>
+          </label>
+        </div>
+
+        <div class="field-group">
+          <h4>Advanced Calculations</h4>
+          <div class="advanced-checkbox-grid">
+            <label><input type="checkbox" id="calc_human_casualties" checked> Human Casualties</label>
+            <label><input type="checkbox" id="calc_infrastructure_damage" checked> Infrastructure Damage</label>
+            <label><input type="checkbox" id="calc_environmental_impact" checked> Environmental Impact</label>
+            <label><input type="checkbox" id="calc_economic_impact" checked> Economic Impact</label>
+            <label><input type="checkbox" id="calc_damage_assessment" checked> Damage Summary</label>
+            <label><input type="checkbox" id="calc_kinetic_energy" checked> Kinetic Energy</label>
+            <label><input type="checkbox" id="calc_atmospheric_entry" checked> Atmospheric Entry</label>
+            <label><input type="checkbox" id="calc_crater_formation" checked> Crater Formation</label>
+            <label><input type="checkbox" id="calc_blast_effects" checked> Blast Effects</label>
+            <label><input type="checkbox" id="calc_tsunami_effects" checked> Tsunami Effects</label>
+            <label><input type="checkbox" id="calc_evacuation_radius" checked> Evacuation Radius</label>
+            <label><input type="checkbox" id="calc_impact_result" checked> Impact Result</label>
+          </div>
+        </div>
+
+        <button type="button" id="advancedCalcButton" style="margin-top:4px;width:100%;padding:8px;background:#2a2a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;">Calculate Advanced Metrics</button>
+        <div id="advancedResults" class="advanced-results"></div>
+      </div>
     </form>
-    <div id="advancedResults" style="margin-top:12px;font-size:12px;display:none;background:rgba(0,0,0,0.03);padding:10px;border-radius:6px;max-height:260px;overflow-y:auto;"></div>
   </div>
   <div id="neoListContainer" style="position:absolute;top:60px;right:10px;width:320px;max-height:400px;overflow-y:auto;background:rgba(255,255,255,0.95);padding:10px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);display:none;">
     <h3 style="margin-top:0;">Select NEO Template</h3>
@@ -441,6 +547,40 @@
     });
 
     const advancedResultsContainer = document.getElementById('advancedResults');
+    const settingsPageButtons = Array.from(document.querySelectorAll('.settings-tab'));
+    const settingsPages = Array.from(document.querySelectorAll('.settings-page'));
+    let currentSettingsPage = 'basic';
+
+    const showSettingsPage = (page) => {
+      if (!page) {
+        return;
+      }
+
+      currentSettingsPage = page;
+
+      settingsPages.forEach((pageEl) => {
+        const isActive = pageEl.dataset.page === page;
+        pageEl.classList.toggle('active', isActive);
+        pageEl.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+      });
+
+      settingsPageButtons.forEach((button) => {
+        const isActive = button.dataset.page === page;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        button.setAttribute('tabindex', isActive ? '0' : '-1');
+      });
+    };
+
+    if (settingsPageButtons.length && settingsPages.length) {
+      settingsPageButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          showSettingsPage(button.dataset.page);
+        });
+      });
+
+      showSettingsPage(currentSettingsPage);
+    }
 
     const formatNumber = (value, options = {}) => {
       if (!Number.isFinite(value)) {
@@ -778,6 +918,8 @@
     if (advancedCalcButton) {
       advancedCalcButton.addEventListener('click', async (event) => {
         event.preventDefault();
+
+        showSettingsPage('advanced');
 
         const button = event.currentTarget;
         const originalText = button.textContent;
