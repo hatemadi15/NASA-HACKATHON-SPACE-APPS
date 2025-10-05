@@ -13,27 +13,6 @@ export function setupCesiumVisualization(containerId) {
 function runCesium(containerId) {
   try {
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1ZGMyMzExNS0yMDA3LTQzOTUtYWI4Zi01MTE1NDVkZjA5MmQiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODkyMjB9.mKL-h_yoK40tAU5y0x366QdYPvh_Gb1-slJDDoY-Atk';
-    // Cesium visualization logic for meteor impact simulator
-// Handles all DOM elements and events
-
-export function setupCesiumVisualization(containerId) {
-  // Wait for DOM to be ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => runCesium(containerId));
-  } else {
-    runCesium(containerId);
-  }
-}
-
-function runCesium(containerId) {
-  try {
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1ZGMyMzExNS0yMDA3LTQzOTUtYWI4Zi01MTE1NDVkZjA5MmQiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODkyMjB9.mKL-h_yoK40tAU5y0x366QdYPvh_Gb1-slJDDoY-Atk';
-    const viewer = new Cesium.Viewer(containerId, {
-      terrain: Cesium.Terrain.fromWorldTerrain(),
-      baseLayerPicker: false
-    });
-
-    viewer.infoBox.frame.sandbox = "allow-same-origin allow-top-navigation allow-pointer-lock allow-popups allow-forms allow-scripts";
     const viewer = new Cesium.Viewer(containerId, {
       terrain: Cesium.Terrain.fromWorldTerrain(),
       baseLayerPicker: false
@@ -50,9 +29,6 @@ function runCesium(containerId) {
     const SECONDS_PER_DAY = 86400;
     const EARTH_RADIUS_METERS = 6378137;
     const EARTH_OBLIQUITY = Cesium.Math.toRadians(23.439281);
-
-    const NASA_API_KEY = window.NASA_API_KEY || 'DEMO_KEY';
-    const NEO_API_URL = 'https://api.nasa.gov/neo/rest/v1/feed';
 
     // State
     const toNumber = (value, fallback) => {
@@ -172,87 +148,6 @@ function runCesium(containerId) {
       };
     };
 
-   // Cesium visualization logic for meteor impact simulator
-// Handles all DOM elements and events
-
-export function setupCesiumVisualization(containerId) {
-  // Wait for DOM to be ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => runCesium(containerId));
-  } else {
-    runCesium(containerId);
-  }
-}
-
-function runCesium(containerId) {
-  try {
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1ZGMyMzExNS0yMDA3LTQzOTUtYWI4Zi01MTE1NDVkZjA5MmQiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODkyMjB9.mKL-h_yoK40tAU5y0x366QdYPvh_Gb1-slJDDoY-Atk';
-    const viewer = new Cesium.Viewer(containerId, {
-      terrain: Cesium.Terrain.fromWorldTerrain(),
-      baseLayerPicker: false
-    });
-
-    viewer.infoBox.frame.sandbox = "allow-same-origin allow-top-navigation allow-pointer-lock allow-popups allow-forms allow-scripts";
-    const viewer = new Cesium.Viewer(containerId, {
-      terrain: Cesium.Terrain.fromWorldTerrain(),
-      baseLayerPicker: false
-    });
-
-    viewer.infoBox.frame.sandbox = "allow-same-origin allow-top-navigation allow-pointer-lock allow-popups allow-forms allow-scripts";
-
-    const NASA_API_KEY = window.NASA_API_KEY || 'DEMO_KEY';
-    const NEO_API_URL = 'https://api.nasa.gov/neo/rest/v1/feed';
-
-    // State
-    const toNumber = (value, fallback) => {
-      if (value === null || value === undefined || value === '') {
-        return fallback;
-      }
-      const num = Number(value);
-      return Number.isFinite(num) ? num : fallback;
-    };
-
-    const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
-
-    const DEFAULT_LOCATION = {
-      latitude: 33.8938,
-      longitude: 35.5018,
-      elevation: 0,
-      terrain_type: 'land',
-      population_density: 0,
-      blast_radius: 50000,
-      crater_diameter: 1200,
-      thermal_radius: 80000,
-      fireball_radius: 20000,
-      evacuation_radius: 100000,
-      launch_longitude: null,
-      launch_latitude: null,
-@@ -116,116 +119,344 @@ function runCesium(containerId) {
-        evacuation_radius: location.evacuation_radius,
-        impact_zones: impactZones,
-        atmospheric_effects: impactSource.atmospheric_effects ?? DEFAULT_IMPACT_RESULT.atmospheric_effects
-      };
-
-      const asteroid = {
-        ...DEFAULT_ASTEROID,
-        ...asteroidSource,
-        diameter: toNumber(asteroidSource.diameter ?? asteroidSource.size ?? payload.asteroid_size, DEFAULT_ASTEROID.diameter),
-        mass: toNumber(asteroidSource.mass ?? payload.asteroid_mass, DEFAULT_ASTEROID.mass),
-        velocity: toNumber(asteroidSource.velocity ?? asteroidSource.speed ?? payload.asteroid_speed, DEFAULT_ASTEROID.velocity),
-        density: toNumber(asteroidSource.density ?? payload.asteroid_density, DEFAULT_ASTEROID.density),
-        impact_angle: toNumber(asteroidSource.impact_angle ?? payload.impact_angle, DEFAULT_ASTEROID.impact_angle),
-        composition: asteroidSource.composition ?? payload.asteroid_composition ?? DEFAULT_ASTEROID.composition
-      };
-
-      return {
-        location,
-        impactResult,
-        asteroid,
-        metadata: payload.metadata ?? payload.simulation_metadata ?? null,
-        simulationId: payload.simulationId ?? payload.simulation_id ?? null
-      };
-    };
-
     const state = {
       activeAnimations: new Set(),
       visualizationEntities: new Set(),
@@ -271,6 +166,7 @@ function runCesium(containerId) {
       loading: false,
       rotationStart: Date.now()
     };
+
     let impact_location = { ...currentSimulation.location };
     let impact_result = { ...currentSimulation.impactResult };
     let asteroid_properties = {
@@ -320,8 +216,118 @@ function runCesium(containerId) {
     });
 
     const neoToggleButton = document.getElementById('neoToggleButton');
+    const neoListContainer = document.getElementById('neoListContainer');
+    const neoList = document.getElementById('neoList');
 
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    const normalizeAngle = (angle) => {
+      if (!Number.isFinite(angle)) {
+        return 0;
+      }
+      const wrapped = angle % TWO_PI;
+      return wrapped < 0 ? wrapped + TWO_PI : wrapped;
+    };
+
+    const toJulianDay = (date) => {
+      const julian = Cesium.JulianDate.fromDate(date);
+      return julian.dayNumber + julian.secondsOfDay / SECONDS_PER_DAY;
+    };
+
+    const solveKepler = (meanAnomaly, eccentricity) => {
+      if (!Number.isFinite(meanAnomaly) || !Number.isFinite(eccentricity)) {
+        return null;
+      }
+      let eccentricAnomaly = eccentricity < 0.8 ? meanAnomaly : Math.PI;
+      for (let i = 0; i < 15; i++) {
+        const delta = (eccentricAnomaly - eccentricity * Math.sin(eccentricAnomaly) - meanAnomaly)
+          / (1 - eccentricity * Math.cos(eccentricAnomaly));
+        eccentricAnomaly -= delta;
+        if (Math.abs(delta) < 1e-10) {
+          break;
+        }
+      }
+      return eccentricAnomaly;
+    };
+
+    const eclipticToEquatorial = ({ x, y, z }) => {
+      const cosObliquity = Math.cos(EARTH_OBLIQUITY);
+      const sinObliquity = Math.sin(EARTH_OBLIQUITY);
+      return {
+        x,
+        y: y * cosObliquity - z * sinObliquity,
+        z: y * sinObliquity + z * cosObliquity
+      };
+    };
+
+    const computeGmst = (date) => {
+      const jd = toJulianDay(date);
+      const T = (jd - 2451545.0) / 36525;
+      let gmst = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
+        + 0.000387933 * T * T - (T * T * T) / 38710000;
+      gmst = ((gmst % 360) + 360) % 360;
+      return gmst * DEG2RAD;
+    };
+
+    const eciToEcef = (vector, date) => {
+      if (!vector) {
+        return null;
+      }
+      const theta = computeGmst(date);
+      const cosTheta = Math.cos(theta);
+      const sinTheta = Math.sin(theta);
+      return {
+        x: vector.x * cosTheta + vector.y * sinTheta,
+        y: -vector.x * sinTheta + vector.y * cosTheta,
+        z: vector.z
+      };
+    };
+
+    const ensureSafeAltitude = (vector) => {
+      if (!vector) {
+        return null;
+      }
+      const { x, y, z } = vector;
+      const distance = Math.sqrt(x * x + y * y + z * z);
+      if (!Number.isFinite(distance) || distance === 0) {
+        return null;
+      }
+      const minimumDistance = EARTH_RADIUS_METERS + 150000;
+      if (distance < minimumDistance) {
+        const scale = minimumDistance / distance;
+        return {
+          x: x * scale,
+          y: y * scale,
+          z: z * scale
+        };
+      }
+      return vector;
+    };
+
+    const computeEarthEquatorialPosition = (date) => {
+      const jd = toJulianDay(date);
+      const T = (jd - 2451545.0) / 36525;
+      const meanLongitude = normalizeAngle((100.46457166 + 35999.37244981 * T) * DEG2RAD);
+      const longitudeOfPerihelion = normalizeAngle((102.93768193 + 0.32327364 * T) * DEG2RAD);
+      const meanAnomaly = normalizeAngle(meanLongitude - longitudeOfPerihelion);
+      const eccentricity = clamp(0.016708634 - 0.000042037 * T - 0.0000001267 * T * T, 0, 0.2);
+      const eccentricAnomaly = solveKepler(meanAnomaly, eccentricity);
+      if (!Number.isFinite(eccentricAnomaly)) {
+        return null;
+      }
+      const cosE = Math.cos(eccentricAnomaly);
+      const sinE = Math.sin(eccentricAnomaly);
+      const sqrtOneMinusESq = Math.sqrt(Math.max(0, 1 - eccentricity * eccentricity));
+      const xv = cosE - eccentricity;
+      const yv = sqrtOneMinusESq * sinE;
+      const trueAnomaly = Math.atan2(yv, xv);
+      const radiusAu = Math.sqrt(xv * xv + yv * yv);
+      const heliocentricLongitude = trueAnomaly + longitudeOfPerihelion;
+      const xEcliptic = radiusAu * Math.cos(heliocentricLongitude) * AU_IN_METERS;
+      const yEcliptic = radiusAu * Math.sin(heliocentricLongitude) * AU_IN_METERS;
+      const zEcliptic = 0;
+      return eclipticToEquatorial({ x: xEcliptic, y: yEcliptic, z: zEcliptic });
+    };
 
     const seededRandom = (seed) => {
       const x = Math.sin(seed) * 10000;
@@ -365,7 +371,7 @@ function runCesium(containerId) {
           entity.show = visible;
         });
       },
-      computePlacement(neo, index) {
+      computeFallbackPlacement(neo, index) {
         const seedSource = `${neo.id || ''}-${neo.name || ''}-${index}`;
         const hash = hashString(seedSource) + 1;
         const baseLon = (hash % 360) - 180;
@@ -380,7 +386,7 @@ function runCesium(containerId) {
           inclination: (seededRandom(hash) * 40) - 20
         };
       },
-      createDynamicPosition(placement) {
+      createFallbackPositionProperty(placement) {
         const { baseLon, baseLat, altitude, angularSpeed, inclination } = placement;
         return new Cesium.CallbackProperty((time, result) => {
           const nowDate = Cesium.JulianDate.toDate(time);
@@ -390,6 +396,134 @@ function runCesium(containerId) {
           const lat = clamp(baseLat + oscillation + inclination * Math.sin(seconds / 600), -85, 85);
           const normalizedLon = ((currentLon + 540) % 360) - 180;
           return Cesium.Cartesian3.fromDegrees(normalizedLon, lat, altitude, Cesium.Ellipsoid.WGS84, result);
+        }, false);
+      },
+      extractOrbitElements(neo) {
+        const orbit = neo?.orbital_data;
+        if (!orbit) {
+          return null;
+        }
+        const semiMajorAxisAu = Number(orbit.semi_major_axis);
+        const eccentricity = Number(orbit.eccentricity);
+        const inclination = Number(orbit.inclination);
+        const ascendingNode = Number(orbit.ascending_node_longitude);
+        const argumentOfPeriapsis = Number(orbit.perihelion_argument);
+        const meanAnomaly = Number(orbit.mean_anomaly);
+        let meanMotion = Number(orbit.mean_motion);
+        const epochJulian = Number(orbit.epoch_osculation);
+        if (!Number.isFinite(semiMajorAxisAu)
+          || !Number.isFinite(eccentricity)
+          || !Number.isFinite(inclination)
+          || !Number.isFinite(ascendingNode)
+          || !Number.isFinite(argumentOfPeriapsis)
+          || !Number.isFinite(meanAnomaly)
+          || !Number.isFinite(epochJulian)) {
+          return null;
+        }
+        const semiMajorAxisMeters = semiMajorAxisAu * AU_IN_METERS;
+        const eccentricityClamped = clamp(eccentricity, 0, 0.99);
+        let meanMotionRadPerDay;
+        if (Number.isFinite(meanMotion)) {
+          meanMotionRadPerDay = meanMotion * DEG2RAD;
+        } else {
+          meanMotionRadPerDay = Math.sqrt(SOLAR_GM / Math.pow(semiMajorAxisMeters, 3)) * SECONDS_PER_DAY;
+        }
+        if (!Number.isFinite(meanMotionRadPerDay)) {
+          return null;
+        }
+        return {
+          semiMajorAxisMeters,
+          eccentricity: eccentricityClamped,
+          inclinationRad: inclination * DEG2RAD,
+          ascendingNodeRad: ascendingNode * DEG2RAD,
+          argumentOfPeriapsisRad: argumentOfPeriapsis * DEG2RAD,
+          meanAnomalyRad: normalizeAngle(meanAnomaly * DEG2RAD),
+          meanMotionRadPerDay,
+          epochJulian
+        };
+      },
+      computeNeoEcefPosition(orbit, date) {
+        if (!orbit) {
+          return null;
+        }
+        const earthEquatorial = computeEarthEquatorialPosition(date);
+        if (!earthEquatorial) {
+          return null;
+        }
+        const julianDay = toJulianDay(date);
+        if (!Number.isFinite(julianDay)) {
+          return null;
+        }
+        const deltaDays = julianDay - orbit.epochJulian;
+        if (!Number.isFinite(deltaDays)) {
+          return null;
+        }
+        const meanAnomaly = normalizeAngle(orbit.meanAnomalyRad + orbit.meanMotionRadPerDay * deltaDays);
+        const eccentricAnomaly = solveKepler(meanAnomaly, orbit.eccentricity);
+        if (!Number.isFinite(eccentricAnomaly)) {
+          return null;
+        }
+        const cosE = Math.cos(eccentricAnomaly);
+        const sinE = Math.sin(eccentricAnomaly);
+        const sqrtOneMinusESq = Math.sqrt(Math.max(0, 1 - orbit.eccentricity * orbit.eccentricity));
+        const radius = orbit.semiMajorAxisMeters * (1 - orbit.eccentricity * cosE);
+        const trueAnomaly = Math.atan2(sqrtOneMinusESq * sinE, cosE - orbit.eccentricity);
+        const cosOmega = Math.cos(orbit.ascendingNodeRad);
+        const sinOmega = Math.sin(orbit.ascendingNodeRad);
+        const cosI = Math.cos(orbit.inclinationRad);
+        const sinI = Math.sin(orbit.inclinationRad);
+        const argPlusTrue = orbit.argumentOfPeriapsisRad + trueAnomaly;
+        const cosArg = Math.cos(argPlusTrue);
+        const sinArg = Math.sin(argPlusTrue);
+        const xEcliptic = radius * (cosOmega * cosArg - sinOmega * sinArg * cosI);
+        const yEcliptic = radius * (sinOmega * cosArg + cosOmega * sinArg * cosI);
+        const zEcliptic = radius * (sinI * sinArg);
+        const asteroidEquatorial = eclipticToEquatorial({ x: xEcliptic, y: yEcliptic, z: zEcliptic });
+        const relativeEci = {
+          x: asteroidEquatorial.x - earthEquatorial.x,
+          y: asteroidEquatorial.y - earthEquatorial.y,
+          z: asteroidEquatorial.z - earthEquatorial.z
+        };
+        const ecef = eciToEcef(relativeEci, date);
+        return ensureSafeAltitude(ecef);
+      },
+      createLabelTextProperty(neo) {
+        if (!neo.orbit) {
+          return neo.name;
+        }
+        return new Cesium.CallbackProperty((time) => {
+          const nowDate = Cesium.JulianDate.toDate(time);
+          const ecef = neoHelpers.computeNeoEcefPosition(neo.orbit, nowDate);
+          if (!ecef) {
+            return neo.name;
+          }
+          const distanceMeters = Math.sqrt(ecef.x * ecef.x + ecef.y * ecef.y + ecef.z * ecef.z);
+          if (!Number.isFinite(distanceMeters)) {
+            return neo.name;
+          }
+          const distanceKm = Math.max(distanceMeters / 1000, 0);
+          const formatted = distanceKm.toLocaleString(undefined, { maximumFractionDigits: 0 });
+          return `${neo.name} (${formatted} km)`;
+        }, false);
+      },
+      createPositionProperty(neo, fallbackPlacement, fallbackProperty) {
+        const fallback = fallbackProperty || neoHelpers.createFallbackPositionProperty(fallbackPlacement);
+        if (!neo.orbit) {
+          return fallback;
+        }
+        return new Cesium.CallbackProperty((time, result) => {
+          const nowDate = Cesium.JulianDate.toDate(time);
+          const ecef = neoHelpers.computeNeoEcefPosition(neo.orbit, nowDate);
+          if (!ecef) {
+            return fallback.getValue(time, result);
+          }
+          if (!result) {
+            return new Cesium.Cartesian3(ecef.x, ecef.y, ecef.z);
+          }
+          result.x = ecef.x;
+          result.y = ecef.y;
+          result.z = ecef.z;
+          return result;
         }, false);
       }
     };
@@ -426,6 +560,15 @@ function runCesium(containerId) {
           }
           const approachDate = approach.close_approach_date_full || approach.close_approach_date;
           const relativeVelocityKps = Number(approach.relative_velocity?.kilometers_per_second);
+          let estimatedDiameterKm = null;
+          const diameterRange = neo.estimated_diameter?.kilometers;
+          if (diameterRange) {
+            const min = Number(diameterRange.estimated_diameter_min);
+            const max = Number(diameterRange.estimated_diameter_max);
+            if (Number.isFinite(min) && Number.isFinite(max)) {
+              estimatedDiameterKm = (min + max) / 2;
+            }
+          }
           results.push({
             id: neo.id,
             name: neo.name,
@@ -433,7 +576,9 @@ function runCesium(containerId) {
             missDistanceKm,
             relativeVelocityKps,
             magnitude: Number(neo.absolute_magnitude_h),
-            isPotentiallyHazardous: Boolean(neo.is_potentially_hazardous_asteroid)
+            isPotentiallyHazardous: Boolean(neo.is_potentially_hazardous_asteroid),
+            orbit: neoHelpers.extractOrbitElements(neo),
+            estimatedDiameterKm
           });
         });
       });
@@ -451,9 +596,23 @@ function runCesium(containerId) {
       const limit = Math.min(neoState.data.length, 25);
       for (let i = 0; i < limit; i++) {
         const neo = neoState.data[i];
-        const placement = neoHelpers.computePlacement(neo, i);
-        const position = neoHelpers.createDynamicPosition(placement);
+        const fallbackPlacement = neoHelpers.computeFallbackPlacement(neo, i);
+        const fallbackPosition = neoHelpers.createFallbackPositionProperty(fallbackPlacement);
+        const position = neoHelpers.createPositionProperty(neo, fallbackPlacement, fallbackPosition);
+        const currentDistanceKm = (() => {
+          if (!neo.orbit) {
+            return null;
+          }
+          const now = new Date();
+          const ecef = neoHelpers.computeNeoEcefPosition(neo.orbit, now);
+          if (!ecef) {
+            return null;
+          }
+          const distanceMeters = Math.sqrt(ecef.x * ecef.x + ecef.y * ecef.y + ecef.z * ecef.z);
+          return Number.isFinite(distanceMeters) ? distanceMeters / 1000 : null;
+        })();
         const entity = viewer.entities.add({
+          id: neo.id,
           position,
           point: {
             pixelSize: 12,
@@ -462,7 +621,7 @@ function runCesium(containerId) {
             outlineColor: Cesium.Color.BLACK
           },
           label: {
-            text: neo.name,
+            text: neoHelpers.createLabelTextProperty(neo),
             font: '12px "Helvetica Neue", Arial, sans-serif',
             fillColor: Cesium.Color.WHITE,
             outlineColor: Cesium.Color.BLACK,
@@ -479,7 +638,10 @@ function runCesium(containerId) {
               <p><strong>Relative Velocity:</strong> ${Number.isFinite(neo.relativeVelocityKps) ? neo.relativeVelocityKps.toFixed(2) : 'Unknown'} km/s</p>
               ${neo.approachDate ? `<p><strong>Close Approach:</strong> ${neo.approachDate}</p>` : ''}
               ${Number.isFinite(neo.magnitude) ? `<p><strong>Absolute Magnitude:</strong> ${neo.magnitude.toFixed(1)}</p>` : ''}
+              ${Number.isFinite(neo.estimatedDiameterKm) ? `<p><strong>Estimated Diameter:</strong> ${neo.estimatedDiameterKm.toFixed(2)} km</p>` : ''}
+              ${Number.isFinite(currentDistanceKm) ? `<p><strong>Current Distance:</strong> ${currentDistanceKm.toLocaleString(undefined, { maximumFractionDigits: 0 })} km</p>` : ''}
               <p><strong>Potentially Hazardous:</strong> ${neo.isPotentiallyHazardous ? 'Yes' : 'No'}</p>
+              ${neo.orbit ? '<p style="font-size:12px;color:#ccc;">Position updates with NASA orbital elements in real time.</p>' : ''}
             </div>
           `
         });
@@ -488,6 +650,72 @@ function runCesium(containerId) {
         neoState.entities.push(entity);
       }
     }
+
+    function renderNeoList(neos) {
+      neoList.innerHTML = '';
+      if (!neos || !neos.length) {
+        neoListContainer.style.display = 'none';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      neos.forEach(neo => {
+        const li = document.createElement('li');
+        li.textContent = `${neo.name} (${neo.missDistanceKm.toFixed(0)} km)`;
+        li.style.padding = '8px';
+        li.style.cursor = 'pointer';
+        li.dataset.neoId = neo.id;
+        li.addEventListener('mouseenter', () => li.style.backgroundColor = '#f0f0f0');
+        li.addEventListener('mouseleave', () => li.style.backgroundColor = 'transparent');
+        fragment.appendChild(li);
+      });
+      neoList.appendChild(fragment);
+      neoListContainer.style.display = 'block';
+    }
+
+    function populateAsteroidDropdown(neos) {
+      const dropdown = document.getElementById('asteroid-focus');
+      dropdown.innerHTML = '<option value="earth">Earth</option>'; // Reset and add Earth option
+      if (!neos || !neos.length) {
+        return;
+      }
+      neos.forEach(neo => {
+        const option = document.createElement('option');
+        option.value = neo.id;
+        option.textContent = neo.name;
+        dropdown.appendChild(option);
+      });
+    }
+
+    document.getElementById('asteroid-focus').addEventListener('change', (event) => {
+      const selectedId = event.target.value;
+      if (selectedId === 'earth') {
+        viewer.trackedEntity = undefined;
+        viewer.camera.flyHome(0);
+      } else {
+        const selectedEntity = neoState.entities.find(entity => {
+          console.log(`Comparing entity.id: ${entity.id} with selectedId: ${selectedId}`);
+          return entity.id === selectedId;
+        });
+        if (selectedEntity) {
+          viewer.zoomTo(selectedEntity);
+          viewer.trackedEntity = selectedEntity;
+        }
+      }
+    });
+
+    neoList.addEventListener('click', (event) => {
+      if (event.target.tagName === 'LI') {
+        const neoId = event.target.dataset.neoId;
+        const selectedNeo = neoState.data.find(neo => neo.id === neoId);
+        if (selectedNeo) {
+          document.getElementById('asteroid_size').value = (selectedNeo.estimatedDiameterKm * 1000).toFixed(0);
+          document.getElementById('asteroid_speed').value = (selectedNeo.relativeVelocityKps * 1000).toFixed(0);
+          // Close the list after selection
+          neoListContainer.style.display = 'none';
+        }
+      }
+    });
 
     async function toggleNeoLayer() {
       if (!neoToggleButton) {
@@ -499,6 +727,7 @@ function runCesium(containerId) {
       if (neoState.visible) {
         neoState.visible = false;
         neoHelpers.ensureVisibility(false);
+        neoListContainer.style.display = 'none';
         neoHelpers.setButtonState({ text: 'Show NEOs' });
         return;
       }
@@ -509,9 +738,11 @@ function runCesium(containerId) {
           neoHelpers.setButtonState({ text: 'Loading NEOs...', loading: true });
           const feed = await fetchNeoFeed();
           neoState.data = transformNeoData(feed);
+          populateAsteroidDropdown(neoState.data);
           neoState.fetchedAt = Date.now();
         }
         renderNeoEntities();
+        renderNeoList(neoState.data);
         neoState.visible = true;
         neoHelpers.ensureVisibility(true);
         const buttonText = neoState.data.length ? `Hide NEOs (${neoState.data.length})` : 'Hide NEOs';
@@ -531,8 +762,9 @@ function runCesium(containerId) {
       neoToggleButton.addEventListener('click', toggleNeoLayer);
       neoHelpers.setButtonState({ text: 'Show NEOs' });
     }
+
     // Animation cleanup function
-     function cleanupAnimations() {
+    function cleanupAnimations() {
       state.activeAnimations.clear();
       viewer.entities.values.slice().forEach(entity => {
         if (
@@ -954,5 +1186,3 @@ function runCesium(containerId) {
     }
   }
 }
-
-

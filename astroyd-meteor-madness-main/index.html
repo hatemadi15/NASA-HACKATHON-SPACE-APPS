@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script>
+    window.NASA_API_KEY = "hrQxzFZd9rjID0v18GXddqx4zmKdd3bjHoOWAq7m";
+  </script>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.133/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <style>
@@ -39,11 +42,11 @@
     #launchButton:hover {
       background: rgba(255, 99, 71, 0.8);
     }
-   #cameraToggleButton {␊
-      position: absolute;␊
-      top: 10px;␊
-      left: 300px;␊
-      z-index: 1000;␊
+    #cameraToggleButton {
+      position: absolute;
+      top: 10px;
+      left: 300px;
+      z-index: 1000;
       padding: 10px 20px;
       background: rgba(0, 123, 255, 0.8);
       border: none;
@@ -51,7 +54,7 @@
       cursor: pointer;
       border-radius: 4px;
       font-size: 14px;
-     }
+    }
     #cameraToggleButton:hover {
       background: rgba(0, 153, 255, 0.8);
     }
@@ -226,13 +229,19 @@
     </div>
   </div>
 
-  <div style="position:absolute;top:10px;right:10px;z-index:2000;background:rgba(255,255,255,0.95);padding:18px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);max-width:320px;">
+  <div id="settingsPanel" style="position:absolute;top:10px;right:10px;z-index:2000;background:rgba(255,255,255,0.95);padding:18px 24px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);max-width:320px;transition:right 0.3s ease-in-out;">
+    <button id="toggleSettingsButton" style="position:absolute;left:-40px;top:0;padding:10px;background:rgba(42,42,42,0.8);color:white;border:none;cursor:pointer;border-radius:4px 0 0 4px;">&gt;</button>
     <div id="status" style="margin-bottom:10px;font-weight:bold;font-size:12px;">Connecting...</div>
     <div id="userInfo" style="display:none;">
         <p>Welcome, <span id="username"></span></p>
     </div>
     <form id="impactForm">
       <h3 style="margin-top:0">Asteroid Impact Settings</h3>
+      <label for="asteroid-focus">Focus on:</label>
+      <select id="asteroid-focus" name="asteroid-focus" style="width:150px;margin-bottom:8px">
+        <option value="earth">Earth</option>
+      </select><br>
+
       <label for="latitude">Latitude:</label>
       <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
       <label for="longitude">Longitude:</label>
@@ -280,6 +289,10 @@
       <label for="evacuation_radius">Evacuation Radius (m):</label>
       <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px"><br>
     </form>
+  </div>
+  <div id="neoListContainer" style="position:absolute;top:60px;right:10px;width:320px;max-height:400px;overflow-y:auto;background:rgba(255,255,255,0.95);padding:10px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);display:none;">
+    <h3 style="margin-top:0;">Select NEO Template</h3>
+    <ul id="neoList" style="list-style:none;padding:0;margin:0;"></ul>
   </div>
   <div id="cesiumContainer"></div>
   <button id="toggleButton">Toggle View</button>
@@ -652,7 +665,21 @@
             userInfo.style.display = 'none';
         });
     }
+
+    const settingsPanel = document.getElementById('settingsPanel');
+    const toggleSettingsButton = document.getElementById('toggleSettingsButton');
+    let settingsVisible = true;
+
+    toggleSettingsButton.addEventListener('click', () => {
+      settingsVisible = !settingsVisible;
+      if (settingsVisible) {
+        settingsPanel.style.right = '10px';
+        toggleSettingsButton.innerHTML = '&gt;';
+      } else {
+        settingsPanel.style.right = '-340px';
+        toggleSettingsButton.innerHTML = '&lt;';
+      }
+    });
   </script>
 </body>
-
 </html>
