@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meteor Defense Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel: rgba(20, 26, 33, 0.95);
+      --accent: #7b1fa2;
+      --accent-light: #ba68c8;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --border: rgba(148, 163, 184, 0.2);
+      --success: #10b981;
+      --warning: #f97316;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, rgba(123, 31, 162, 0.15), transparent 45%),
+                  radial-gradient(circle at bottom, rgba(59, 130, 246, 0.15), transparent 40%),
+                  var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 24px clamp(16px, 4vw, 64px) 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: linear-gradient(135deg, rgba(123, 31, 162, 0.25), rgba(15, 23, 42, 0.95));
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+
+    header h1 {
+      margin: 0;
+      font-family: 'Orbitron', 'Roboto', sans-serif;
+      font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.5rem);
+      letter-spacing: 2px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      max-width: 620px;
+      line-height: 1.4;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hero-actions button,
+    .hero-actions a {
+      border: none;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 150ms ease, box-shadow 150ms ease;
+      font-size: 0.8rem;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      color: white;
+      box-shadow: 0 10px 25px rgba(123, 31, 162, 0.35);
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(123, 31, 162, 0.45);
+    }
+
+    .ghost-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .ghost-btn:hover {
+      color: var(--text);
+      transform: translateY(-2px);
+    }
+
+    main {
+      flex: 1;
+      padding: 24px clamp(16px, 4vw, 64px) 56px;
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    section {
+      background: var(--panel);
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    section::after {
+      content: "";
+      position: absolute;
+      inset: -20% 40% 40% -20%;
+      background: radial-gradient(circle at top right, rgba(123, 31, 162, 0.18), transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    h2 {
+      font-family: 'Orbitron', 'Roboto', sans-serif;
+      margin: 0;
+      z-index: 1;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+      color: var(--muted);
+      z-index: 1;
+    }
+
+    .level-list,
+    .category-list,
+    .loadout-items,
+    .simulation-results,
+    .leaderboard {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 1;
+    }
+
+    .level-card,
+    .shop-item {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+      transition: border 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .level-card:hover,
+    .shop-item:hover {
+      border-color: var(--accent-light);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 22px rgba(123, 31, 162, 0.15);
+    }
+
+    .level-card.active {
+      border-color: var(--accent-light);
+      box-shadow: 0 12px 22px rgba(123, 31, 162, 0.25);
+    }
+
+    .level-meta,
+    .item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .tag {
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(123, 31, 162, 0.2);
+      color: var(--accent-light);
+    }
+
+    .shop-category {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .shop-category h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--accent-light);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .resource-summary {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      z-index: 1;
+    }
+
+    .resource-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+      font-size: 0.85rem;
+    }
+
+    .loadout-items .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 32px 0;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+
+    .start-button {
+      margin-top: auto;
+      align-self: flex-start;
+      background: linear-gradient(135deg, #2563eb, #38bdf8);
+      color: white;
+      padding: 14px 32px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      border: none;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: transform 150ms ease, box-shadow 150ms ease;
+    }
+
+    .start-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .start-button:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35);
+    }
+
+    .results-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .result-card {
+      padding: 16px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .result-card strong {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    .result-value {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    .leaderboard table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .leaderboard th,
+    .leaderboard td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .leaderboard tbody tr:nth-child(odd) {
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    footer {
+      padding: 16px clamp(16px, 4vw, 64px) 32px;
+      text-align: center;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      background: rgba(10, 12, 16, 0.9);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .hero-actions {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Meteor Defense Planner</h1>
+      <p>Strategize NASA-backed planetary defense missions. Choose a level, invest in research-driven upgrades, and deploy the ultimate protection before the asteroid strikes.</p>
+    </div>
+    <div class="hero-actions">
+      <button class="primary-btn" id="start-simulation">Run Scenario</button>
+      <a href="index.html" class="ghost-btn">Back to Main Simulation</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="level-selection">
+      <h2>1 · Select a Pre-Made Threat Scenario</h2>
+      <p>Each level is based on curated asteroid impact data. Beat levels to earn mission funding and NASA research breakthroughs.</p>
+      <div class="level-list" id="levelList"></div>
+    </section>
+
+    <section id="shop">
+      <h2>2 · Assemble Your Defense System</h2>
+      <p>Invest in tech upgrades before launch. Spend your mission budget and research points to unlock advanced tools.</p>
+      <div class="resource-summary" id="resourceSummary"></div>
+      <div class="category-list" id="shopCategories"></div>
+    </section>
+
+    <section id="loadout">
+      <h2>3 · Launch Configuration</h2>
+      <p>Review your active defenses. Tune the loadout before you kick off the simulation.</p>
+      <div class="loadout-items" id="selectedLoadout">
+        <div class="empty">No systems selected yet. Choose items from the shop to build your response.</div>
+      </div>
+      <button class="start-button" id="launchScenario" disabled>Start Simulation</button>
+    </section>
+
+    <section id="results">
+      <h2>4 · Simulation Outcome</h2>
+      <p>Run the mission to see the projected damages, mission costs, and leaderboard standing.</p>
+      <div class="simulation-results" id="resultsContainer">
+        <div class="results-grid">
+          <div class="result-card">
+            <strong>Damage Prevented</strong>
+            <span class="result-value" id="damagePrevented">—</span>
+          </div>
+          <div class="result-card">
+            <strong>Mission Cost</strong>
+            <span class="result-value" id="missionCost">—</span>
+          </div>
+          <div class="result-card">
+            <strong>Cost Efficiency</strong>
+            <span class="result-value" id="costEfficiency">—</span>
+          </div>
+          <div class="result-card">
+            <strong>Leaderboard Rank</strong>
+            <span class="result-value" id="leaderboardRank">—</span>
+          </div>
+        </div>
+        <div class="leaderboard">
+          <h3>Global Response Leaderboard</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Commander</th>
+                <th>Level</th>
+                <th>Efficiency</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    NASA Space Apps · Meteor Madness Defense Game Prototype · Crafted for rapid mission planning previews.
+  </footer>
+
+  <script>
+    const levels = [
+      {
+        id: 'valles-marineris',
+        name: 'Valles Marineris Strike',
+        difficulty: 'Hard',
+        payout: { credits: 3200, research: 6 },
+        data: '648m carbonaceous asteroid on a Mars-skimming trajectory redirected toward Earth.',
+        baseDamage: 780000,
+        requiredPower: 120
+      },
+      {
+        id: 'aurora-borealis',
+        name: 'Aurora Borealis Window',
+        difficulty: 'Medium',
+        payout: { credits: 2200, research: 4 },
+        data: '392m iron-rich body entering at a polar inclination with high entry speed.',
+        baseDamage: 520000,
+        requiredPower: 85
+      },
+      {
+        id: 'pacific-guardian',
+        name: 'Pacific Guardian',
+        difficulty: 'Easy',
+        payout: { credits: 1400, research: 2 },
+        data: '190m stony asteroid projected to impact the northern Pacific shipping lanes.',
+        baseDamage: 260000,
+        requiredPower: 55
+      }
+    ];
+
+    const categories = [
+      {
+        id: 'lasers',
+        name: 'Orbital Lasers',
+        items: [
+          { id: 'laser-mk1', name: 'Helios Mk I', level: 1, research: 0, cost: 650, power: 28 },
+          { id: 'laser-mk2', name: 'Helios Mk II', level: 2, research: 2, cost: 950, power: 40 },
+          { id: 'laser-array', name: 'Apollo Array', level: 3, research: 4, cost: 1400, power: 60 }
+        ]
+      },
+      {
+        id: 'kinetics',
+        name: 'Kinetic Impactors',
+        items: [
+          { id: 'kinetic-duo', name: 'Atlas Twin-Strike', level: 1, research: 0, cost: 520, power: 20 },
+          { id: 'kinetic-swarm', name: 'Aegis Swarm', level: 2, research: 3, cost: 880, power: 36 },
+          { id: 'kinetic-precursor', name: 'Prometheus Precursor', level: 3, research: 5, cost: 1300, power: 55 }
+        ]
+      },
+      {
+        id: 'craft',
+        name: 'Autonomous Craft',
+        items: [
+          { id: 'craft-scout', name: 'Scout Drones', level: 1, research: 1, cost: 420, power: 12 },
+          { id: 'craft-interceptor', name: 'Interceptor Wing', level: 2, research: 3, cost: 780, power: 26 },
+          { id: 'craft-guardian', name: 'Guardian Fleet', level: 3, research: 6, cost: 1180, power: 44 }
+        ]
+      },
+      {
+        id: 'shields',
+        name: 'Planetary Shields',
+        items: [
+          { id: 'shield-atmo', name: 'Atmospheric Modulators', level: 1, research: 2, cost: 600, power: 18 },
+          { id: 'shield-ion', name: 'Ionospheric Guard', level: 2, research: 4, cost: 960, power: 32 },
+          { id: 'shield-planetary', name: 'Planetary Aegis', level: 3, research: 7, cost: 1500, power: 58 }
+        ]
+      }
+    ];
+
+    const leaderboard = [
+      { commander: 'Dr. Vega', level: 'Valles Marineris', efficiency: 92 },
+      { commander: 'Commander Imani', level: 'Aurora Borealis', efficiency: 88 },
+      { commander: 'Captain Singh', level: 'Pacific Guardian', efficiency: 81 },
+      { commander: 'Lt. Alvarez', level: 'Aurora Borealis', efficiency: 78 }
+    ];
+
+    let currentLeaderboard = [...leaderboard];
+
+    const progressionBase = { credits: 800, research: 1 };
+
+    const state = {
+      credits: 0,
+      research: 0,
+      selectedLevel: null,
+      loadout: new Map(),
+      initialCredits: 0,
+      scenarioComplete: false
+    };
+
+    const levelList = document.getElementById('levelList');
+    const resourceSummary = document.getElementById('resourceSummary');
+    const shopCategories = document.getElementById('shopCategories');
+    const selectedLoadout = document.getElementById('selectedLoadout');
+    const launchButton = document.getElementById('launchScenario');
+    const runScenarioButton = document.getElementById('start-simulation');
+
+    runScenarioButton.disabled = true;
+
+    const damagePreventedEl = document.getElementById('damagePrevented');
+    const missionCostEl = document.getElementById('missionCost');
+    const costEfficiencyEl = document.getElementById('costEfficiency');
+    const leaderboardRankEl = document.getElementById('leaderboardRank');
+    const leaderboardBody = document.getElementById('leaderboardBody');
+
+    function formatCredits(value) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value * 1000);
+    }
+
+    function renderLevels() {
+      levelList.innerHTML = '';
+      levels.forEach(level => {
+        const card = document.createElement('button');
+        card.className = 'level-card';
+        card.type = 'button';
+        card.innerHTML = `
+          <div class="tag">${level.difficulty}</div>
+          <strong>${level.name}</strong>
+          <p>${level.data}</p>
+          <div class="level-meta">
+            <span>🛰 Required Power: <strong>${level.requiredPower}</strong></span>
+            <span>💰 Reward: <strong>${formatCredits(level.payout.credits)}</strong></span>
+            <span>🔬 Research: <strong>+${level.payout.research}</strong></span>
+          </div>
+        `;
+
+        if (state.selectedLevel && state.selectedLevel.id === level.id) {
+          card.classList.add('active');
+        }
+
+        card.addEventListener('click', () => selectLevel(level));
+
+        levelList.appendChild(card);
+      });
+    }
+
+    function selectLevel(level) {
+      state.selectedLevel = level;
+      state.credits = progressionBase.credits + level.payout.credits;
+      state.research = progressionBase.research + level.payout.research;
+      state.initialCredits = state.credits;
+      state.loadout.clear();
+      runScenarioButton.disabled = false;
+      Array.from(levelList.children).forEach(child => child.classList.remove('active'));
+      const activeCard = Array.from(levelList.children).find(child => child.textContent.includes(level.name));
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+      markScenarioPending(true);
+      currentLeaderboard = [...leaderboard];
+      renderResources();
+      renderShop();
+      renderLoadout();
+      renderLeaderboard();
+      updateLaunchState();
+    }
+
+    function renderResources() {
+      resourceSummary.innerHTML = '';
+      const creditPill = document.createElement('span');
+      creditPill.className = 'resource-pill';
+      creditPill.textContent = `Mission Budget: ${formatCredits(state.credits)}`;
+
+      const researchPill = document.createElement('span');
+      researchPill.className = 'resource-pill';
+      researchPill.textContent = `NASA Research Points: ${state.research}`;
+
+      const powerPill = document.createElement('span');
+      powerPill.className = 'resource-pill';
+      powerPill.textContent = `Total Defense Power: ${getTotalPower()}`;
+
+      resourceSummary.append(creditPill, researchPill, powerPill);
+    }
+
+    function renderShop() {
+      shopCategories.innerHTML = '';
+      categories.forEach(category => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'shop-category';
+        wrapper.innerHTML = `<h3>${category.name}</h3>`;
+
+        category.items.forEach(item => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'shop-item';
+
+          const unlocked = state.research >= item.research;
+          const affordable = state.credits >= item.cost;
+          const selected = state.loadout.has(item.id);
+
+          button.innerHTML = `
+            <div class="item-header">
+              <strong>${item.name}</strong>
+            </div>
+            <div class="item-meta">
+              <span>Level ${item.level}</span>
+              <span>Power +${item.power}</span>
+              <span>Cost ${formatCredits(item.cost)}</span>
+              <span>Research ${item.research}</span>
+            </div>
+            <p>${unlocked ? 'Ready for deployment.' : 'Unlock with additional NASA research.'}</p>
+          `;
+
+          if (!unlocked) {
+            button.disabled = true;
+            button.style.opacity = 0.5;
+          } else if (!affordable && !selected) {
+            button.disabled = true;
+            button.style.opacity = 0.6;
+            button.querySelector('p').textContent = 'Insufficient mission budget.';
+          }
+
+          if (selected) {
+            button.classList.add('active');
+            button.querySelector('p').textContent = 'Selected for launch.';
+          }
+
+          button.addEventListener('click', () => toggleItem(item));
+          wrapper.appendChild(button);
+        });
+
+        shopCategories.appendChild(wrapper);
+      });
+    }
+
+    function resetResultsDisplay() {
+      damagePreventedEl.textContent = '—';
+      missionCostEl.textContent = '—';
+      costEfficiencyEl.textContent = '—';
+      leaderboardRankEl.textContent = '—';
+    }
+
+    function markScenarioPending(forceReset = false) {
+      if (state.scenarioComplete || forceReset) {
+        state.scenarioComplete = false;
+        runScenarioButton.textContent = 'Run Scenario';
+        launchButton.textContent = 'Start Simulation';
+        resetResultsDisplay();
+      }
+    }
+
+    function toggleItem(item) {
+      if (state.loadout.has(item.id)) {
+        state.loadout.delete(item.id);
+        state.credits += item.cost;
+      } else {
+        if (state.credits < item.cost || state.research < item.research) {
+          return;
+        }
+        state.loadout.set(item.id, item);
+        state.credits -= item.cost;
+      }
+      markScenarioPending();
+      renderResources();
+      renderShop();
+      renderLoadout();
+      updateLaunchState();
+    }
+
+    function renderLoadout() {
+      selectedLoadout.innerHTML = '';
+      if (state.loadout.size === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No systems selected yet. Choose items from the shop to build your response.';
+        selectedLoadout.appendChild(empty);
+        return;
+      }
+
+      state.loadout.forEach(item => {
+        const container = document.createElement('div');
+        container.className = 'shop-item';
+        container.innerHTML = `
+          <strong>${item.name}</strong>
+          <div class="item-meta">
+            <span>Category: ${getCategoryName(item.id)}</span>
+            <span>Power +${item.power}</span>
+            <span>Cost ${formatCredits(item.cost)}</span>
+            <span>Research ${item.research}</span>
+          </div>
+        `;
+        selectedLoadout.appendChild(container);
+      });
+    }
+
+    function getCategoryName(itemId) {
+      for (const category of categories) {
+        const found = category.items.find(item => item.id === itemId);
+        if (found) {
+          return category.name;
+        }
+      }
+      return 'Unknown';
+    }
+
+    function getTotalPower() {
+      let power = 0;
+      state.loadout.forEach(item => {
+        power += item.power;
+      });
+      return power;
+    }
+
+    function updateLaunchState() {
+      const hasLevel = Boolean(state.selectedLevel);
+      const powerSufficient = state.selectedLevel ? getTotalPower() >= state.selectedLevel.requiredPower : false;
+      if (!hasLevel) {
+        launchButton.disabled = true;
+        launchButton.textContent = 'Select a Level';
+        return;
+      }
+
+      launchButton.disabled = !(hasLevel && powerSufficient);
+      if (state.scenarioComplete) {
+        launchButton.textContent = 'Simulation Complete';
+      } else {
+        launchButton.textContent = powerSufficient ? 'Start Simulation' : 'Add More Power';
+      }
+    }
+
+    function renderLeaderboard() {
+      leaderboardBody.innerHTML = '';
+      currentLeaderboard.forEach((entry, idx) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${entry.commander}</td>
+          <td>${entry.level}</td>
+          <td>${entry.efficiency}%</td>
+        `;
+        leaderboardBody.appendChild(row);
+      });
+    }
+
+    function runSimulation() {
+      if (!state.selectedLevel) return;
+      const level = state.selectedLevel;
+      const totalPower = getTotalPower();
+      const mitigationRatio = Math.min(totalPower / level.requiredPower, 1.35);
+      const prevented = Math.round(level.baseDamage * mitigationRatio);
+      const spent = Math.max(0, (state.initialCredits - state.credits) * 1000);
+      const efficiency = spent > 0 ? Math.round((prevented / spent) * 100) : 0;
+
+      damagePreventedEl.textContent = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(prevented) + ' lives saved';
+      missionCostEl.textContent = formatCredits(spent / 1000);
+      costEfficiencyEl.textContent = efficiency ? efficiency + ' %' : '—';
+
+      currentLeaderboard = [
+        ...leaderboard.filter(entry => entry.commander !== 'You'),
+        { commander: 'You', level: level.name, efficiency }
+      ].sort((a, b) => b.efficiency - a.efficiency);
+
+      renderLeaderboard();
+
+      const simulatedRank = currentLeaderboard.findIndex(entry => entry.commander === 'You');
+      leaderboardRankEl.textContent = simulatedRank >= 0 ? '#' + (simulatedRank + 1) : '—';
+
+      runScenarioButton.textContent = 'Scenario Complete';
+      state.scenarioComplete = true;
+      updateLaunchState();
+    }
+
+    function syncStartButtons() {
+      runScenarioButton.addEventListener('click', () => {
+        if (!state.selectedLevel) {
+          alert('Select a level and configure your defenses first.');
+          return;
+        }
+
+        if (launchButton.disabled && !state.scenarioComplete) {
+          alert('Add enough defense power to meet the mission requirements.');
+          return;
+        }
+
+        launchButton.click();
+      });
+
+      launchButton.addEventListener('click', () => {
+        runSimulation();
+      });
+    }
+
+    renderLevels();
+    renderResources();
+    renderShop();
+    renderLoadout();
+    resetResultsDisplay();
+    renderLeaderboard();
+    updateLaunchState();
+    syncStartButtons();
+  </script>
+</body>
+</html>

@@ -291,6 +291,10 @@
       <label for="evacuation_radius">Evacuation Radius (m):</label>
       <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px"><br>
     </form>
+    <div id="damageMetrics" style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.05);border-radius:6px;">
+      <h4 style="margin:0 0 8px;font-size:14px;">Damage Assessment</h4>
+      <div id="damageMetricsContent" style="font-size:12px;color:#333;">Run the advanced metrics to view estimated damage outcomes.</div>
+    </div>
   </div>
   <div id="neoListContainer" style="position:absolute;top:60px;right:10px;width:320px;max-height:400px;overflow-y:auto;background:rgba(255,255,255,0.95);padding:10px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);display:none;">
     <h3 style="margin-top:0;">Select NEO Template</h3>
@@ -302,6 +306,7 @@
   <button id="neoToggleButton" type="button">Show NEOs</button>
   <button id="launchButton" type="button">Launch Simulation</button>
   <button id="advanced-calculation" type="button" style="position:absolute;top:10px;left:600px;z-index:1000;padding:10px 20px;background:rgba(34,139,34,0.85);border:none;color:white;cursor:pointer;border-radius:4px;font-size:14px;">Advanced Metrics</button>
+  <button id="defense-planner-button" type="button" style="position:absolute;top:10px;left:760px;z-index:1000;padding:10px 20px;background:rgba(123, 31, 162, 0.85);border:none;color:white;cursor:pointer;border-radius:4px;font-size:14px;">Defense Planner</button>
   <script type="module">
     import { setupCesiumVisualization } from './cesium-visualization.js';
     import { MeteorMadnessAPI } from './api-client.js';
@@ -320,6 +325,16 @@
       }
       const parsed = parseFloat(element.value);
       return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const setNumericInputValue = (elementId, value) => {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return;
+      }
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.value = value;
+      }
     };
 
     const DEFAULT_SIMULATION = {
@@ -361,13 +376,123 @@
         affected_area: 0
       },
       metadata: null,
-      simulationId: null
+      simulationId: null,
+      damageAssessment: null
     };
 
     let latestSimulation = clone(DEFAULT_SIMULATION);
 
     const api = new MeteorMadnessAPI();
     let cachedHistory = [];
+
+    const damageMetricsContainer = document.getElementById('damageMetrics');
+    const damageMetricsContent = document.getElementById('damageMetricsContent');
+    const defaultDamageMetricsMessage = damageMetricsContent
+      ? damageMetricsContent.textContent
+      : 'Run the advanced metrics to view estimated damage outcomes.';
+
+    const formatMetricLabel = (label) => label
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (match) => match.toUpperCase());
+
+    const appendMetricValue = (parent, value) => {
+      if (!parent) {
+        return;
+      }
+
+      if (value === null || value === undefined) {
+        parent.appendChild(document.createTextNode('N/A'));
+        return;
+      }
+
+      if (typeof value === 'number') {
+        const abs = Math.abs(value);
+        const formatted = value.toLocaleString(undefined, {
+          maximumFractionDigits: abs >= 1000 ? 2 : 3
+        });
+        parent.appendChild(document.createTextNode(formatted));
+        return;
+      }
+
+      if (typeof value === 'boolean') {
+        parent.appendChild(document.createTextNode(value ? 'Yes' : 'No'));
+        return;
+      }
+
+      if (typeof value === 'string') {
+        parent.appendChild(document.createTextNode(value));
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          parent.appendChild(document.createTextNode('N/A'));
+          return;
+        }
+        const list = document.createElement('ul');
+        list.style.listStyle = 'disc';
+        list.style.margin = '4px 0 4px 16px';
+        list.style.padding = '0';
+        value.forEach((item) => {
+          const li = document.createElement('li');
+          appendMetricValue(li, item);
+          list.appendChild(li);
+        });
+        parent.appendChild(list);
+        return;
+      }
+
+      const list = document.createElement('ul');
+      list.style.listStyle = 'none';
+      list.style.padding = '0';
+      list.style.margin = '4px 0';
+      Object.entries(value).forEach(([key, nestedValue]) => {
+        const li = document.createElement('li');
+        li.style.marginBottom = '6px';
+        const labelEl = document.createElement('strong');
+        labelEl.textContent = `${formatMetricLabel(key)}:`;
+        li.appendChild(labelEl);
+        li.appendChild(document.createTextNode(' '));
+        appendMetricValue(li, nestedValue);
+        list.appendChild(li);
+      });
+      parent.appendChild(list);
+    };
+
+    const renderDamageMetrics = (advancedResult, { loading = false, error = null } = {}) => {
+      if (!damageMetricsContainer || !damageMetricsContent) {
+        return;
+      }
+
+      damageMetricsContainer.style.display = 'block';
+      damageMetricsContent.innerHTML = '';
+
+      if (loading) {
+        damageMetricsContent.textContent = 'Calculating advanced metrics...';
+        return;
+      }
+
+      if (error) {
+        damageMetricsContent.textContent = error;
+        return;
+      }
+
+      const damageAssessment = advancedResult?.damage_assessment
+        ?? advancedResult?.damageAssessment
+        ?? advancedResult?.damage_metrics;
+      if (!damageAssessment || (typeof damageAssessment === 'object' && !Array.isArray(damageAssessment) && Object.keys(damageAssessment).length === 0)) {
+        damageMetricsContent.textContent = defaultDamageMetricsMessage;
+        return;
+      }
+
+      appendMetricValue(damageMetricsContent, damageAssessment);
+    };
+
+    window.addEventListener('advancedImpactCalculated', (event) => {
+      if (event?.detail) {
+        renderDamageMetrics(event.detail);
+      }
+    });
 
     const renderHistoryTable = (history) => {
       const tableBody = document.getElementById('historyTableBody');
@@ -490,8 +615,11 @@
             atmospheric_effects: impactResult.atmospheric_effects ?? DEFAULT_SIMULATION.impactResult.atmospheric_effects
           },
           metadata: simulationResult.simulation_metadata ?? null,
-          simulationId: simulationResult.simulation_id ?? null
+          simulationId: simulationResult.simulation_id ?? null,
+          damageAssessment: null
         };
+
+        renderDamageMetrics(null);
 
         const latestImpactResult = latestSimulation.impactResult || {};
 
@@ -552,6 +680,8 @@
         advancedCalculationButton.textContent = 'Calculating...';
         advancedCalculationButton.disabled = true;
 
+        renderDamageMetrics(null, { loading: true });
+
         const latitude = getNumericValue('latitude', latestSimulation.location.latitude);
         const longitude = getNumericValue('longitude', latestSimulation.location.longitude);
         const elevation = getNumericValue('elevation', latestSimulation.location.elevation);
@@ -605,7 +735,84 @@
             }
           }
 
-          window.dispatchEvent(new CustomEvent('advancedImpactCalculated', { detail: clone(advancedResult) }));
+          const advancedImpactResult = advancedResult?.impact_result ?? {};
+          const advancedImpactLocation = advancedResult?.impact_location ?? {};
+          const damageAssessment = advancedResult?.damage_assessment ?? null;
+
+          const previousImpactResult = latestSimulation.impactResult || {};
+          const mergedImpactResult = {
+            ...DEFAULT_SIMULATION.impactResult,
+            ...previousImpactResult,
+            ...advancedImpactResult,
+            impact_zones: Array.isArray(advancedImpactResult.impact_zones)
+              ? advancedImpactResult.impact_zones
+              : (Array.isArray(previousImpactResult.impact_zones)
+                ? previousImpactResult.impact_zones
+                : DEFAULT_SIMULATION.impactResult.impact_zones),
+            atmospheric_effects: advancedImpactResult.atmospheric_effects
+              ?? previousImpactResult.atmospheric_effects
+              ?? DEFAULT_SIMULATION.impactResult.atmospheric_effects
+          };
+
+          const mergedLocation = {
+            ...latestSimulation.location,
+            ...advancedImpactLocation
+          };
+
+          if (typeof resolvedDensity === 'number' && Number.isFinite(resolvedDensity)) {
+            mergedLocation.population_density = resolvedDensity;
+          }
+
+          const propagateMetrics = ['crater_diameter', 'blast_radius', 'thermal_radius', 'fireball_radius', 'evacuation_radius'];
+          propagateMetrics.forEach((metric) => {
+            const metricValue = mergedImpactResult[metric];
+            if (typeof metricValue === 'number' && Number.isFinite(metricValue)) {
+              mergedLocation[metric] = metricValue;
+              setNumericInputValue(metric, metricValue);
+            }
+          });
+
+          if (typeof mergedLocation.latitude === 'number' && Number.isFinite(mergedLocation.latitude)) {
+            setNumericInputValue('latitude', mergedLocation.latitude);
+          }
+          if (typeof mergedLocation.longitude === 'number' && Number.isFinite(mergedLocation.longitude)) {
+            setNumericInputValue('longitude', mergedLocation.longitude);
+          }
+          if (typeof mergedLocation.elevation === 'number' && Number.isFinite(mergedLocation.elevation)) {
+            setNumericInputValue('elevation', mergedLocation.elevation);
+          }
+
+          if (terrainSelect && typeof mergedLocation.terrain_type === 'string') {
+            terrainSelect.value = mergedLocation.terrain_type;
+          }
+
+          const advancedMetadata = advancedResult?.simulation_metadata ?? advancedResult?.metadata ?? latestSimulation.metadata ?? null;
+          const advancedSimulationId = advancedResult?.simulation_id ?? advancedResult?.simulationId ?? latestSimulation.simulationId ?? null;
+
+          latestSimulation = {
+            ...latestSimulation,
+            location: mergedLocation,
+            impactResult: mergedImpactResult,
+            damageAssessment: damageAssessment ?? latestSimulation.damageAssessment ?? null,
+            metadata: advancedMetadata,
+            simulationId: advancedSimulationId
+          };
+
+          window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: clone(latestSimulation) }));
+
+          renderDamageMetrics(advancedResult);
+
+          let advancedEventPayload = advancedResult ? clone(advancedResult) : {};
+          if (typeof advancedEventPayload !== 'object' || advancedEventPayload === null) {
+            advancedEventPayload = {
+              simulation: clone(latestSimulation),
+              settingsDispatched: true
+            };
+          } else {
+            advancedEventPayload.simulation = clone(latestSimulation);
+            advancedEventPayload.settingsDispatched = true;
+          }
+          window.dispatchEvent(new CustomEvent('advancedImpactCalculated', { detail: advancedEventPayload }));
 
           const statusEl = document.getElementById('status');
           if (statusEl) {
@@ -621,6 +828,7 @@
             statusEl.textContent = 'Advanced metrics calculation failed';
             statusEl.style.color = 'red';
           }
+          renderDamageMetrics(null, { error: 'Advanced metrics calculation failed. Please try again.' });
         } finally {
           advancedCalculationButton.textContent = originalText;
           advancedCalculationButton.disabled = false;
@@ -768,6 +976,13 @@
             historyButton.style.display = 'none';
             userInfo.style.display = 'none';
         });
+    }
+
+    const defensePlannerButton = document.getElementById('defense-planner-button');
+    if (defensePlannerButton) {
+      defensePlannerButton.addEventListener('click', () => {
+        window.location.href = 'defense-planner.html';
+      });
     }
 
     const settingsPanel = document.getElementById('settingsPanel');
