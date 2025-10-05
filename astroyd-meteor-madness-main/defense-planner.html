@@ -760,7 +760,10 @@
       window.dispatchEvent(new CustomEvent('defenseStrategyUpdated', {
         detail: {
           plan,
-          source: 'defense-planner'
+          meta: {
+            source: 'defense-planner',
+            autoFollow: true
+          }
         }
       }));
     }
@@ -1042,7 +1045,7 @@
       const accuracyDisplay = Number.isFinite(totals.accuracy) ? Math.round(totals.accuracy) : null;
       const summary = totals.success
         ? `Defense intercept succeeded with${accuracyDisplay !== null ? ` ${accuracyDisplay}%` : ''} accuracy.`
-        : `Defense window missed — accuracy${accuracyDisplay !== null ? ` ${accuracyDisplay}%` : ''} below required threshold.`;
+        : `Defense window missed — accuracy${accuracyDisplay !== null ? ` ${accuracyDisplay}%` : ''} below required 90% threshold.`;
       return {
         approachPoint: approach,
         interceptPoint,
@@ -1065,7 +1068,7 @@
       const synergyBonus = clamp(state.loadout.size * 4.5, 0, 18);
       const randomness = Math.random() * 18 - 6;
       const accuracy = clamp(Math.round(accuracyBase + synergyBonus + randomness), 0, 100);
-      const success = accuracy >= 20;
+      const success = accuracy >= 90;
       const prevented = success
         ? Math.round(level.baseDamage * mitigationRatio * (accuracy / 100))
         : 0;

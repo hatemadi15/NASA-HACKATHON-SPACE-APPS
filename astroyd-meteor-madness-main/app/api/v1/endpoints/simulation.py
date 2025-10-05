@@ -548,10 +548,11 @@ async def get_deflection_leaderboard(
                 ties_at_rank += 1
             candidate["rank"] = current_rank
 
+        next_rank = (current_rank + 1) if ranked_candidates else 1
         for entry in leaderboard_entries:
             if entry.get("games_played"):
                 continue
-            entry["rank"] = None
+            entry["rank"] = next_rank
 
         leaderboard_entries.sort(
             key=lambda entry: (

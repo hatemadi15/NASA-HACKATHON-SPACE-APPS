@@ -162,6 +162,9 @@ function runCesium(containerId) {
     let latestDefensePlan = window.__latestDefensePlan || null;
     let latestDefenseOutcome = null;
     let hasFocusedOnDefensePlan = false;
+    let cameraMode = 'impact';
+    let asteroidEntity = null;
+    let pendingDefenseAutoFollow = false;
 
     const defenseColors = {
       lasers: Cesium.Color.fromCssColorString('#7b1fa2'),
@@ -241,16 +244,39 @@ function runCesium(containerId) {
     });
 
     window.addEventListener('defenseStrategyUpdated', (event) => {
-      const plan = event?.detail?.plan ?? event?.detail ?? null;
+      const detail = event?.detail ?? {};
+      const plan = detail?.plan ?? detail ?? null;
       if (!plan || !Array.isArray(plan.loadout) || plan.loadout.length === 0) {
         clearDefenseEntities();
         latestDefensePlan = null;
+        latestDefenseOutcome = null;
         hasFocusedOnDefensePlan = false;
+        pendingDefenseAutoFollow = false;
         return;
       }
-      const metaSource = event?.detail?.meta?.source;
-      const shouldFlyTo = metaSource === 'storage' || metaSource === 'bootstrap';
+      const meta = detail.meta ?? {};
+      const metaSource = meta.source ?? detail.source ?? null;
+      const autoFollowSources = ['storage', 'bootstrap', 'defense-planner'];
+      const shouldAutoFollow = meta.autoFollow === true
+        || (metaSource ? autoFollowSources.includes(metaSource) : false);
+      const shouldFlyTo = shouldAutoFollow || meta.flyTo === true;
+      if (shouldAutoFollow) {
+        pendingDefenseAutoFollow = true;
+      }
       renderDefensePlan(plan, { flyTo: shouldFlyTo });
+      if (pendingDefenseAutoFollow) {
+        pendingDefenseAutoFollow = false;
+        cameraMode = 'asteroid';
+        const cameraToggleButton = document.getElementById('cameraToggleButton');
+        if (cameraToggleButton) {
+          cameraToggleButton.textContent = 'Focus Impact';
+        }
+        try {
+          resetSimulation();
+        } catch (error) {
+          console.warn('Failed to auto-launch defense visualization', error);
+        }
+      }
     });
 
     const neoToggleButton = document.getElementById('neoToggleButton');
@@ -821,6 +847,7 @@ function runCesium(containerId) {
       state.defenseEntities.forEach(entity => viewer.entities.remove(entity));
       state.defenseEntities.clear();
       latestDefenseOutcome = null;
+      pendingDefenseAutoFollow = false;
     }
 
     function renderDefensePlan(plan, { flyTo = false } = {}) {
@@ -842,6 +869,20 @@ function runCesium(containerId) {
       const baseLat = toNumber(locationSource.latitude, impact_location.latitude);
       const baseLon = toNumber(locationSource.longitude, impact_location.longitude);
       const baseElevation = toNumber(locationSource.elevation, impact_location.elevation);
+
+      impact_location.latitude = baseLat;
+      impact_location.longitude = baseLon;
+      impact_location.elevation = baseElevation;
+      impactCartesian = Cesium.Cartesian3.fromDegrees(baseLon, baseLat, Math.max(baseElevation, 0));
+      currentSimulation = {
+        ...currentSimulation,
+        location: {
+          ...currentSimulation.location,
+          latitude: baseLat,
+          longitude: baseLon,
+          elevation: baseElevation
+        }
+      };
       const engagement = plan.engagement || {};
 
       if (engagement.approachPoint) {
@@ -1207,8 +1248,6 @@ function runCesium(containerId) {
     }
 
     // Asteroid trajectory and impact sequence
-    let cameraMode = 'impact';
-    let asteroidEntity = null;
     function animateAsteroidAndImpact() {
       // Use asteroid speed to affect animation duration and clock multiplier
       // Use asteroid size to affect visual size
@@ -1616,10 +1655,15 @@ function runCesium(containerId) {
       state.visualizationEntities.clear();
       state.craterEntities.clear();
       state.neoEntities.clear();
+      state.defenseEntities.clear();
       neoState.entities = [];
       state.isShowingCrater = false;
       document.getElementById('toggleButton').style.display = 'none';
       document.getElementById('toggleButton').textContent = 'Show Crater';
+
+      if (latestDefensePlan && Array.isArray(latestDefensePlan.loadout) && latestDefensePlan.loadout.length) {
+        renderDefensePlan(latestDefensePlan, { flyTo: false });
+      }
 
       if (neoState.visible && neoState.data.length) {
         renderNeoEntities();

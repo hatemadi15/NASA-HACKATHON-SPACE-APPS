@@ -386,6 +386,7 @@
     let cachedHistory = [];
 
     const DEFENSE_PLAN_STORAGE_KEY = 'defensePlanner:lastConfiguration';
+    const DEFENSE_PLAN_AUTO_FOLLOW_SOURCES = new Set(['defense-planner', 'storage', 'bootstrap']);
 
     const safeParseJson = (value) => {
       if (typeof value !== 'string' || !value.length) {
@@ -404,11 +405,16 @@
         return;
       }
       window.__latestDefensePlan = plan;
+      const source = meta?.source ?? null;
+      const shouldAutoFollow = typeof meta.autoFollow === 'boolean'
+        ? meta.autoFollow
+        : (source ? DEFENSE_PLAN_AUTO_FOLLOW_SOURCES.has(source) : false);
       window.dispatchEvent(new CustomEvent('defenseStrategyUpdated', {
         detail: {
           plan,
           meta: {
             ...meta,
+            autoFollow: shouldAutoFollow,
             receivedAt: Date.now()
           }
         }
