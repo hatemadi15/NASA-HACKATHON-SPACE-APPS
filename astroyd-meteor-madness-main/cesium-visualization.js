@@ -81,6 +81,25 @@ function runCesium(containerId) {
       composition: 'stony'
     };
 
+    const clone = (value) => {
+      if (typeof structuredClone === 'function') {
+        try {
+          return structuredClone(value);
+        } catch (error) {
+          console.warn('Failed to structuredClone value, falling back to JSON clone', error);
+        }
+      }
+      if (value === null || value === undefined) {
+        return value;
+      }
+      try {
+        return JSON.parse(JSON.stringify(value));
+      } catch (jsonError) {
+        console.warn('Failed to JSON clone value', jsonError);
+        return value;
+      }
+    };
+
     const normalizeSimulationPayload = (raw) => {
       if (!raw) {
         return {
@@ -198,6 +217,142 @@ function runCesium(containerId) {
       impact_location.latitude,
       impact_location.elevation
     );
+
+    const IMPACT_MARKER_ID = 'impact-location-marker';
+    let impactMarkerEntity = viewer.entities.add({
+      id: IMPACT_MARKER_ID,
+      position: impactCartesian,
+      point: {
+        pixelSize: 18,
+        color: Cesium.Color.RED,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      description: 'Selected Impact Location'
+    });
+    state.visualizationEntities.add(impactMarkerEntity);
+
+    const updateImpactMarker = (position) => {
+      if (!position) {
+        return;
+      }
+      let marker = viewer.entities.getById(IMPACT_MARKER_ID);
+      if (!marker) {
+        marker = viewer.entities.add({
+          id: IMPACT_MARKER_ID,
+          position,
+          point: {
+            pixelSize: 18,
+            color: Cesium.Color.RED,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          description: 'Selected Impact Location'
+        });
+      } else {
+        marker.position = position;
+      }
+      impactMarkerEntity = marker;
+      state.visualizationEntities.add(marker);
+    };
+
+    const pickGlobePosition = (clickPosition) => {
+      if (!clickPosition) {
+        return null;
+      }
+      const scene = viewer.scene;
+      if (!scene) {
+        return null;
+      }
+      let pickedPosition = null;
+      try {
+        pickedPosition = scene.pickPosition(clickPosition);
+      } catch (error) {
+        console.warn('pickPosition failed, attempting ray pick', error);
+      }
+      if (!Cesium.defined(pickedPosition)) {
+        const ray = viewer.camera.getPickRay(clickPosition);
+        if (!ray) {
+          return null;
+        }
+        pickedPosition = scene.globe.pick(ray, scene);
+      }
+      return Cesium.defined(pickedPosition) ? pickedPosition : null;
+    };
+
+    const applyManualImpactSelection = (cartographic) => {
+      if (!cartographic) {
+        return;
+      }
+      const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+      const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+      const elevation = cartographic.height ?? 0;
+
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(elevation)) {
+        return;
+      }
+
+      impact_location = {
+        ...impact_location,
+        latitude,
+        longitude,
+        elevation
+      };
+
+      impactCartesian = Cesium.Cartesian3.fromDegrees(longitude, latitude, elevation);
+      updateImpactMarker(impactCartesian);
+
+      const latitudeInput = document.getElementById('latitude');
+      if (latitudeInput) {
+        latitudeInput.value = latitude.toFixed(6);
+      }
+      const longitudeInput = document.getElementById('longitude');
+      if (longitudeInput) {
+        longitudeInput.value = longitude.toFixed(6);
+      }
+      const elevationInput = document.getElementById('elevation');
+      if (elevationInput) {
+        elevationInput.value = elevation.toFixed(2);
+      }
+
+      const updatedSimulation = {
+        ...currentSimulation,
+        location: {
+          ...currentSimulation.location,
+          latitude,
+          longitude,
+          elevation
+        }
+      };
+
+      currentSimulation = updatedSimulation;
+
+      window.dispatchEvent(new CustomEvent('impactSettingsChanged', {
+        detail: clone(updatedSimulation)
+      }));
+    };
+
+    const screenSpaceHandler = viewer.screenSpaceEventHandler
+      || new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+    screenSpaceHandler.setInputAction((movement) => {
+      if (defenseOverlayEnabled) {
+        return;
+      }
+      const cartesian = pickGlobePosition(movement?.position);
+      if (!cartesian) {
+        return;
+      }
+      const cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(cartesian);
+      if (!cartographic) {
+        return;
+      }
+      applyManualImpactSelection(cartographic);
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     function applySimulationState(payload) {
       if (payload) {
@@ -906,6 +1061,7 @@ function runCesium(containerId) {
       impact_location.longitude = baseLon;
       impact_location.elevation = baseElevation;
       impactCartesian = Cesium.Cartesian3.fromDegrees(baseLon, baseLat, Math.max(baseElevation, 0));
+      updateImpactMarker(impactCartesian);
       currentSimulation = {
         ...currentSimulation,
         location: {
@@ -1161,20 +1317,36 @@ function runCesium(containerId) {
     // Danger zones visualization
     function createDangerZones() {
       console.log("createDangerZones called");
-      state.visualizationEntities.forEach(entity => viewer.entities.remove(entity));
+       const preservedEntities = [];
+      state.visualizationEntities.forEach((entity) => {
+        if (!entity) {
+          return;
+        }
+        if (entity.id === IMPACT_MARKER_ID) {
+          preservedEntities.push(entity);
+          return;
+        }
+        viewer.entities.remove(entity);
+      });
       state.visualizationEntities.clear();
+       impactMarkerEntity = viewer.entities.getById(IMPACT_MARKER_ID) || impactMarkerEntity;
+      if (impactMarkerEntity) {
+        impactMarkerEntity.position = impactCartesian;
+        state.visualizationEntities.add(impactMarkerEntity);
+      } else {
+        updateImpactMarker(impactCartesian);
+      }
       const rings = [
         { radius: impact_result.blast_radius, color: Cesium.Color.RED.withAlpha(0.3), name: 'Blast Radius' },
         { radius: impact_result.thermal_radius, color: Cesium.Color.ORANGE.withAlpha(0.2), name: 'Thermal Radius' },
         { radius: impact_result.fireball_radius, color: Cesium.Color.YELLOW.withAlpha(0.2), name: 'Fireball Radius' },
         { radius: impact_result.evacuation_radius, color: Cesium.Color.BLUE.withAlpha(0.1), name: 'Evacuation Radius' }
       ];
-      const impactPoint = viewer.entities.add({
-        position: impactCartesian,
-        point: { pixelSize: 20, color: Cesium.Color.RED },
-        description: 'Impact Point'
+     preservedEntities.forEach((entity) => {
+        if (entity && entity.id === IMPACT_MARKER_ID) {
+          state.visualizationEntities.add(entity);
+        }
       });
-      state.visualizationEntities.add(impactPoint);
       rings.forEach((ring, index) => {
         setTimeout(() => {
           const entity = viewer.entities.add({
