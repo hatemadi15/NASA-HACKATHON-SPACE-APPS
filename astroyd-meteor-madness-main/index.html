@@ -304,6 +304,13 @@
   <button id="toggleButton">Toggle View</button>
   <button id="cameraToggleButton">Follow Asteroid</button>
   <button id="neoToggleButton" type="button">Show NEOs</button>
+  <div id="defenseOverlayControls" style="position:absolute;top:10px;left:940px;z-index:1000;display:flex;gap:12px;align-items:center;background:rgba(255,255,255,0.85);padding:6px 10px;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,0.15);">
+    <label for="defenseOverlayToggle" style="display:flex;align-items:center;gap:6px;font-size:12px;color:#222;white-space:nowrap;">
+      <input id="defenseOverlayToggle" type="checkbox" style="margin:0;">
+      Show Defense Overlays
+    </label>
+    <button id="replayDefenseButton" type="button" style="padding:6px 12px;border:none;border-radius:4px;background:rgba(33,150,243,0.9);color:#fff;font-size:12px;cursor:pointer;white-space:nowrap;" disabled>Replay Defense Strategy</button>
+  </div>
   <button id="launchButton" type="button">Launch Simulation</button>
   <button id="advanced-calculation" type="button" style="position:absolute;top:10px;left:600px;z-index:1000;padding:10px 20px;background:rgba(34,139,34,0.85);border:none;color:white;cursor:pointer;border-radius:4px;font-size:14px;">Advanced Metrics</button>
   <button id="defense-planner-button" type="button" style="position:absolute;top:10px;left:760px;z-index:1000;padding:10px 20px;background:rgba(123, 31, 162, 0.85);border:none;color:white;cursor:pointer;border-radius:4px;font-size:14px;">Defense Planner</button>
@@ -385,8 +392,45 @@
     const api = new MeteorMadnessAPI();
     let cachedHistory = [];
 
+    const defenseOverlayToggle = document.getElementById('defenseOverlayToggle');
+    const replayDefenseButton = document.getElementById('replayDefenseButton');
+    let defenseOverlayEnabled = false;
+
     const DEFENSE_PLAN_STORAGE_KEY = 'defensePlanner:lastConfiguration';
     const DEFENSE_PLAN_AUTO_FOLLOW_SOURCES = new Set(['defense-planner', 'storage', 'bootstrap']);
+
+    const emitDefenseOverlayPreference = () => {
+      window.defenseOverlayEnabled = defenseOverlayEnabled;
+      window.dispatchEvent(new CustomEvent('defenseOverlayPreferenceChanged', {
+        detail: { enabled: defenseOverlayEnabled }
+      }));
+    };
+
+    const updateDefenseReplayAvailability = (plan) => {
+      if (!replayDefenseButton) {
+        return;
+      }
+      const hasPlan = !!(plan && Array.isArray(plan.loadout) && plan.loadout.length);
+      replayDefenseButton.disabled = !hasPlan;
+    };
+
+    emitDefenseOverlayPreference();
+
+    if (defenseOverlayToggle) {
+      defenseOverlayToggle.checked = defenseOverlayEnabled;
+      defenseOverlayToggle.addEventListener('change', () => {
+        defenseOverlayEnabled = defenseOverlayToggle.checked;
+        emitDefenseOverlayPreference();
+      });
+    }
+
+    if (replayDefenseButton) {
+      replayDefenseButton.addEventListener('click', () => {
+        if (typeof window.replayDefenseVisualization === 'function') {
+          window.replayDefenseVisualization();
+        }
+      });
+    }
 
     const safeParseJson = (value) => {
       if (typeof value !== 'string' || !value.length) {
@@ -402,9 +446,11 @@
 
     const dispatchDefensePlanUpdate = (plan, meta = {}) => {
       if (!plan || typeof plan !== 'object') {
+        updateDefenseReplayAvailability(null);
         return;
       }
       window.__latestDefensePlan = plan;
+      updateDefenseReplayAvailability(plan);
       const source = meta?.source ?? null;
       const shouldAutoFollow = typeof meta.autoFollow === 'boolean'
         ? meta.autoFollow
@@ -549,6 +595,12 @@
       if (event?.detail) {
         renderDamageMetrics(event.detail);
       }
+    });
+
+    window.addEventListener('defenseStrategyUpdated', (event) => {
+      const detail = event?.detail ?? null;
+      const plan = detail?.plan ?? detail ?? null;
+      updateDefenseReplayAvailability(plan);
     });
 
     const renderHistoryTable = (history) => {

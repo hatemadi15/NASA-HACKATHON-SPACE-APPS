@@ -165,6 +165,7 @@ function runCesium(containerId) {
     let cameraMode = 'impact';
     let asteroidEntity = null;
     let pendingDefenseAutoFollow = false;
+    let defenseOverlayEnabled = Boolean(window.defenseOverlayEnabled);
 
     const defenseColors = {
       lasers: Cesium.Color.fromCssColorString('#7b1fa2'),
@@ -243,27 +244,56 @@ function runCesium(containerId) {
       createDangerZones();
     });
 
-    window.addEventListener('defenseStrategyUpdated', (event) => {
-      const detail = event?.detail ?? {};
-      const plan = detail?.plan ?? detail ?? null;
-      if (!plan || !Array.isArray(plan.loadout) || plan.loadout.length === 0) {
+    window.addEventListener('defenseOverlayPreferenceChanged', (event) => {
+      defenseOverlayEnabled = Boolean(event?.detail?.enabled);
+      if (!defenseOverlayEnabled) {
         clearDefenseEntities();
-        latestDefensePlan = null;
-        latestDefenseOutcome = null;
         hasFocusedOnDefensePlan = false;
         pendingDefenseAutoFollow = false;
         return;
       }
+      if (latestDefensePlan && Array.isArray(latestDefensePlan.loadout) && latestDefensePlan.loadout.length) {
+        renderDefensePlan(latestDefensePlan, { flyTo: false });
+      }
+    });
+
+    window.addEventListener('defenseStrategyUpdated', (event) => {
+      const detail = event?.detail ?? {};
+      const plan = detail?.plan ?? detail ?? null;
+      if (!plan || !Array.isArray(plan.loadout) || plan.loadout.length === 0) {
+        latestDefensePlan = null;
+        clearDefenseEntities();
+        hasFocusedOnDefensePlan = false;
+        pendingDefenseAutoFollow = false;
+        return;
+      }
+
+      latestDefensePlan = plan;
+
       const meta = detail.meta ?? {};
       const metaSource = meta.source ?? detail.source ?? null;
       const autoFollowSources = ['storage', 'bootstrap', 'defense-planner'];
       const shouldAutoFollow = meta.autoFollow === true
         || (metaSource ? autoFollowSources.includes(metaSource) : false);
       const shouldFlyTo = shouldAutoFollow || meta.flyTo === true;
-      if (shouldAutoFollow) {
+      const forceVisualization = meta.forceVisualization === true;
+      const shouldRenderDefense = (defenseOverlayEnabled || forceVisualization)
+        && Array.isArray(plan.loadout)
+        && plan.loadout.length > 0;
+
+      if (!shouldRenderDefense) {
+        clearDefenseEntities();
+        hasFocusedOnDefensePlan = false;
+        pendingDefenseAutoFollow = false;
+        return;
+      }
+
+      renderDefensePlan(plan, { flyTo: shouldFlyTo });
+
+      if (shouldAutoFollow || forceVisualization) {
         pendingDefenseAutoFollow = true;
       }
-      renderDefensePlan(plan, { flyTo: shouldFlyTo });
+
       if (pendingDefenseAutoFollow) {
         pendingDefenseAutoFollow = false;
         cameraMode = 'asteroid';
@@ -272,7 +302,9 @@ function runCesium(containerId) {
           cameraToggleButton.textContent = 'Focus Impact';
         }
         try {
-          resetSimulation();
+          resetSimulation({
+            forceDefenseVisualization: forceVisualization && !defenseOverlayEnabled
+          });
         } catch (error) {
           console.warn('Failed to auto-launch defense visualization', error);
         }
@@ -1647,7 +1679,7 @@ function runCesium(containerId) {
         });
       }
     });
-    function resetSimulation() {
+    function resetSimulation({ forceDefenseVisualization = false } = {}) {
       console.log("resetSimulation called");
       applySimulationState();
       cleanupAnimations();
@@ -1661,8 +1693,15 @@ function runCesium(containerId) {
       document.getElementById('toggleButton').style.display = 'none';
       document.getElementById('toggleButton').textContent = 'Show Crater';
 
-      if (latestDefensePlan && Array.isArray(latestDefensePlan.loadout) && latestDefensePlan.loadout.length) {
+      const shouldRenderDefense = (forceDefenseVisualization || defenseOverlayEnabled)
+        && latestDefensePlan
+        && Array.isArray(latestDefensePlan.loadout)
+        && latestDefensePlan.loadout.length > 0;
+
+      if (shouldRenderDefense) {
         renderDefensePlan(latestDefensePlan, { flyTo: false });
+      } else {
+        clearDefenseEntities();
       }
 
       if (neoState.visible && neoState.data.length) {
@@ -1692,6 +1731,23 @@ function runCesium(containerId) {
         resetSimulation();
       } catch (simulationError) {
         console.error('Failed to restart Cesium simulation', simulationError);
+      }
+    };
+
+    window.replayDefenseVisualization = () => {
+      if (!latestDefensePlan || !Array.isArray(latestDefensePlan.loadout) || latestDefensePlan.loadout.length === 0) {
+        return;
+      }
+      try {
+        renderDefensePlan(latestDefensePlan, { flyTo: true });
+        cameraMode = 'asteroid';
+        const cameraToggleButton = document.getElementById('cameraToggleButton');
+        if (cameraToggleButton) {
+          cameraToggleButton.textContent = 'Focus Impact';
+        }
+        resetSimulation({ forceDefenseVisualization: !defenseOverlayEnabled });
+      } catch (error) {
+        console.error('Failed to replay defense visualization', error);
       }
     };
 
