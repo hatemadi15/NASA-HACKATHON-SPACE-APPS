@@ -679,12 +679,17 @@
           composition: document.getElementById('composition').value
         };
 
+          const populationDensityInput = parseFloat(document.getElementById('population_density').value);
+        const populationDensity = Number.isFinite(populationDensityInput) ? populationDensityInput : 0;
+
         const impactLocation = {
           latitude: parseFloat(document.getElementById('latitude').value),
           longitude: parseFloat(document.getElementById('longitude').value),
           elevation: parseFloat(document.getElementById('elevation').value),
-          terrain_type: document.getElementById('terrain_type').value
+          terrain_type: document.getElementById('terrain_type').value,
+          population_density: populationDensity
         };
+
 
         const simulationResult = await api.simulateImpact(asteroidData, impactLocation);
 
@@ -699,7 +704,9 @@
             longitude: impactLocation.longitude,
             elevation: impactLocation.elevation,
             terrain_type: impactLocation.terrain_type,
-            population_density: simulationResult.impact_location?.population_density ?? impactLocation.population_density ?? 0,
+             population_density: Number.isFinite(simulationResult.impact_location?.population_density)
+              ? simulationResult.impact_location.population_density
+              : populationDensity,
             blast_radius: impactResult.blast_radius ?? DEFAULT_SIMULATION.location.blast_radius,
             crater_diameter: impactResult.crater_diameter ?? DEFAULT_SIMULATION.location.crater_diameter,
             thermal_radius: impactResult.thermal_radius ?? DEFAULT_SIMULATION.location.thermal_radius,
@@ -1111,4 +1118,5 @@
     });
   </script>
 </body>
+
 </html>
