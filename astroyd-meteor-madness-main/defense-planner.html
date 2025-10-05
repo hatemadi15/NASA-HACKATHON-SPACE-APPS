@@ -296,17 +296,46 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 0.9rem;
+      background: rgba(10, 15, 25, 0.6);
+      border-radius: 12px;
+      overflow: hidden;
     }
 
     .leaderboard th,
     .leaderboard td {
       padding: 10px 12px;
       text-align: left;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      vertical-align: middle;
+    }
+
+    .leaderboard thead {
+      background: rgba(123, 31, 162, 0.18);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.75rem;
     }
 
     .leaderboard tbody tr:nth-child(odd) {
-      background: rgba(15, 23, 42, 0.5);
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .leaderboard tbody tr.player-row {
+      background: rgba(123, 31, 162, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(123, 31, 162, 0.32);
+    }
+
+    .leaderboard tbody tr.empty td {
+      text-align: center;
+      color: var(--muted);
+      padding: 18px;
+      font-style: italic;
+    }
+
+    .muted {
+      color: var(--muted);
+      margin: 4px 0 0;
+      font-size: 0.82rem;
     }
 
     footer {
@@ -397,14 +426,17 @@
           <table>
             <thead>
               <tr>
-                <th>Rank</th>
+                <th>#</th>
                 <th>Commander</th>
-                <th>Level</th>
-                <th>Efficiency</th>
+                <th>Score</th>
+                <th>Method</th>
+                <th>Mission</th>
+                <th>Outcome</th>
               </tr>
             </thead>
             <tbody id="leaderboardBody"></tbody>
           </table>
+          <p id="leaderboardStatus" class="muted">Loading live leaderboard…</p>
         </div>
       </div>
     </section>
@@ -423,7 +455,8 @@
         payout: { credits: 3200, research: 6 },
         data: '648m carbonaceous asteroid on a Mars-skimming trajectory redirected toward Earth.',
         baseDamage: 780000,
-        requiredPower: 120
+        requiredPower: 120,
+        impactLocation: { latitude: 15.4, longitude: -74.6, elevation: 0 }
       },
       {
         id: 'aurora-borealis',
@@ -432,7 +465,8 @@
         payout: { credits: 2200, research: 4 },
         data: '392m iron-rich body entering at a polar inclination with high entry speed.',
         baseDamage: 520000,
-        requiredPower: 85
+        requiredPower: 85,
+        impactLocation: { latitude: 69.6, longitude: -96.8, elevation: 0 }
       },
       {
         id: 'pacific-guardian',
@@ -441,7 +475,8 @@
         payout: { credits: 1400, research: 2 },
         data: '190m stony asteroid projected to impact the northern Pacific shipping lanes.',
         baseDamage: 260000,
-        requiredPower: 55
+        requiredPower: 55,
+        impactLocation: { latitude: 24.5, longitude: -151.6, elevation: 0 }
       }
     ];
 
@@ -484,14 +519,18 @@
       }
     ];
 
-    const leaderboard = [
-      { commander: 'Dr. Vega', level: 'Valles Marineris', efficiency: 92 },
-      { commander: 'Commander Imani', level: 'Aurora Borealis', efficiency: 88 },
-      { commander: 'Captain Singh', level: 'Pacific Guardian', efficiency: 81 },
-      { commander: 'Lt. Alvarez', level: 'Aurora Borealis', efficiency: 78 }
+    const API_BASE_URL = window.API_BASE_URL || 'http://localhost:8000/api/v1';
+    const DEFENSE_PLAN_STORAGE_KEY = 'defensePlanner:lastConfiguration';
+
+    const fallbackLeaderboard = [
+      { commander: 'Dr. Vega', mission: 'Valles Marineris', score: 920000, efficiency: 108, method: 'Kinetic Impactor', outcome: 'Success' },
+      { commander: 'Commander Imani', mission: 'Aurora Borealis', score: 880000, efficiency: 102, method: 'Orbital Lasers', outcome: 'Success' },
+      { commander: 'Captain Singh', mission: 'Pacific Guardian', score: 810000, efficiency: 94, method: 'Autonomous Craft', outcome: 'Partial' },
+      { commander: 'Lt. Alvarez', mission: 'Aurora Borealis', score: 780000, efficiency: 90, method: 'Planetary Shields', outcome: 'Success' }
     ];
 
-    let currentLeaderboard = [...leaderboard];
+    const leaderboard = [];
+    let currentLeaderboard = [];
 
     const progressionBase = { credits: 800, research: 1 };
 
@@ -518,9 +557,179 @@
     const costEfficiencyEl = document.getElementById('costEfficiency');
     const leaderboardRankEl = document.getElementById('leaderboardRank');
     const leaderboardBody = document.getElementById('leaderboardBody');
+    const leaderboardStatus = document.getElementById('leaderboardStatus');
 
     function formatCredits(value) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value * 1000);
+    }
+
+    function formatScore(value) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return '—';
+      }
+      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+    }
+
+    function mergeOutcomeText(entry) {
+      const parts = [];
+      if (entry?.outcome) {
+        parts.push(entry.outcome);
+      }
+      if (Number.isFinite(entry?.efficiency)) {
+        parts.push(`${entry.efficiency}% eff.`);
+      }
+      return parts.length ? parts.join(' · ') : '—';
+    }
+
+    function getComparableScore(entry) {
+      if (!entry || typeof entry !== 'object') {
+        return 0;
+      }
+      if (Number.isFinite(entry.score)) {
+        return entry.score;
+      }
+      if (Number.isFinite(entry.efficiency)) {
+        return entry.efficiency;
+      }
+      return 0;
+    }
+
+    function transformLeaderboardEntry(entry, index = 0) {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const commander = entry.player_name || entry.username || entry.commander || entry.full_name || `Commander ${index + 1}`;
+      const mission = entry.mission || entry.level || entry.level_name || entry.difficulty_level || entry.target || entry.scenario || '—';
+      const method = entry.deflection_method || entry.method || entry.strategy || '—';
+      const rawScore = Number.parseFloat(entry.score);
+      const score = Number.isFinite(rawScore) ? rawScore : null;
+      const efficiencySource = entry.efficiency ?? entry.cost_efficiency ?? entry.success_rate;
+      let efficiency = null;
+      if (Number.isFinite(efficiencySource)) {
+        efficiency = Math.round(efficiencySource * (efficiencySource <= 1 ? 100 : 1));
+      }
+      const outcome = entry.outcome
+        || (typeof entry.success === 'boolean' ? (entry.success ? 'Success' : 'Failed') : null)
+        || (typeof entry.success_rate === 'number' ? `${Math.round(entry.success_rate * 100)}% success` : null);
+
+      return {
+        commander,
+        mission,
+        method,
+        score,
+        efficiency,
+        outcome,
+        raw: entry
+      };
+    }
+
+    function setLeaderboardEntries(entries, { source = 'local', fallbackUsed = false } = {}) {
+      const normalized = entries
+        .filter(Boolean)
+        .map(entry => ({ ...entry }))
+        .sort((a, b) => getComparableScore(b) - getComparableScore(a));
+      leaderboard.length = 0;
+      normalized.forEach(entry => leaderboard.push(entry));
+      currentLeaderboard = [...leaderboard];
+      renderLeaderboard();
+      if (leaderboardStatus) {
+        if (!currentLeaderboard.length) {
+          leaderboardStatus.textContent = 'No leaderboard entries yet. Run a scenario to become the first commander!';
+        } else if (fallbackUsed) {
+          leaderboardStatus.textContent = 'Live leaderboard unavailable — showing recent NASA training sims.';
+        } else if (source === 'api') {
+          leaderboardStatus.textContent = 'Live leaderboard synced with registered commanders.';
+        } else {
+          leaderboardStatus.textContent = 'Leaderboard updated.';
+        }
+      }
+    }
+
+    async function loadLeaderboard() {
+      if (!window.fetch) {
+        setLeaderboardEntries(fallbackLeaderboard, { fallbackUsed: true });
+        return;
+      }
+      try {
+        if (leaderboardStatus) {
+          leaderboardStatus.textContent = 'Loading live leaderboard…';
+        }
+        const response = await fetch(`${API_BASE_URL}/simulation/deflection-game/leaderboard`);
+        if (!response.ok) {
+          throw new Error(`Leaderboard request failed with status ${response.status}`);
+        }
+        const payload = await response.json();
+        const entries = Array.isArray(payload)
+          ? payload
+          : (Array.isArray(payload?.leaderboard) ? payload.leaderboard : []);
+        if (!entries.length) {
+          setLeaderboardEntries([], { source: 'api' });
+          return;
+        }
+        const mapped = entries
+          .map((entry, index) => transformLeaderboardEntry(entry, index))
+          .filter(Boolean);
+        setLeaderboardEntries(mapped, { source: 'api' });
+      } catch (error) {
+        console.warn('Unable to load live leaderboard', error);
+        if (!leaderboard.length) {
+          setLeaderboardEntries(fallbackLeaderboard, { fallbackUsed: true });
+        } else if (leaderboardStatus) {
+          leaderboardStatus.textContent = 'Unable to reach live leaderboard — displaying last known data.';
+        }
+      }
+    }
+
+    function buildLoadoutSnapshot() {
+      return Array.from(state.loadout.values()).map(item => ({
+        id: item.id,
+        name: item.name,
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        power: item.power,
+        cost: item.cost,
+        research: item.research
+      }));
+    }
+
+    function buildDefensePlan(level, stats) {
+      return {
+        timestamp: Date.now(),
+        level: level ? {
+          id: level.id,
+          name: level.name,
+          difficulty: level.difficulty,
+          impactLocation: level.impactLocation || null
+        } : null,
+        loadout: buildLoadoutSnapshot(),
+        totals: {
+          power: stats.totalPower,
+          creditsAllocated: state.initialCredits,
+          creditsRemaining: state.credits,
+          creditsSpent: state.initialCredits - state.credits,
+          missionCost: stats.spent,
+          damagePrevented: stats.prevented,
+          efficiency: stats.efficiency
+        }
+      };
+    }
+
+    function syncDefensePlan(plan) {
+      if (!plan) {
+        return;
+      }
+      window.__latestDefensePlan = plan;
+      try {
+        localStorage.setItem(DEFENSE_PLAN_STORAGE_KEY, JSON.stringify(plan));
+      } catch (storageError) {
+        console.warn('Failed to persist defense plan for visualization sync', storageError);
+      }
+      window.dispatchEvent(new CustomEvent('defenseStrategyUpdated', {
+        detail: {
+          plan,
+          source: 'defense-planner'
+        }
+      }));
     }
 
     function renderLevels() {
@@ -596,23 +805,28 @@
         wrapper.innerHTML = `<h3>${category.name}</h3>`;
 
         category.items.forEach(item => {
+          const loadoutItem = {
+            ...item,
+            categoryId: category.id,
+            categoryName: category.name
+          };
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'shop-item';
 
-          const unlocked = state.research >= item.research;
-          const affordable = state.credits >= item.cost;
-          const selected = state.loadout.has(item.id);
+          const unlocked = state.research >= loadoutItem.research;
+          const affordable = state.credits >= loadoutItem.cost;
+          const selected = state.loadout.has(loadoutItem.id);
 
           button.innerHTML = `
             <div class="item-header">
-              <strong>${item.name}</strong>
+              <strong>${loadoutItem.name}</strong>
             </div>
             <div class="item-meta">
-              <span>Level ${item.level}</span>
-              <span>Power +${item.power}</span>
-              <span>Cost ${formatCredits(item.cost)}</span>
-              <span>Research ${item.research}</span>
+              <span>Level ${loadoutItem.level}</span>
+              <span>Power +${loadoutItem.power}</span>
+              <span>Cost ${formatCredits(loadoutItem.cost)}</span>
+              <span>Research ${loadoutItem.research}</span>
             </div>
             <p>${unlocked ? 'Ready for deployment.' : 'Unlock with additional NASA research.'}</p>
           `;
@@ -631,7 +845,7 @@
             button.querySelector('p').textContent = 'Selected for launch.';
           }
 
-          button.addEventListener('click', () => toggleItem(item));
+          button.addEventListener('click', () => toggleItem(loadoutItem));
           wrapper.appendChild(button);
         });
 
@@ -657,8 +871,9 @@
 
     function toggleItem(item) {
       if (state.loadout.has(item.id)) {
+        const existing = state.loadout.get(item.id);
         state.loadout.delete(item.id);
-        state.credits += item.cost;
+        state.credits += existing.cost;
       } else {
         if (state.credits < item.cost || state.research < item.research) {
           return;
@@ -689,7 +904,7 @@
         container.innerHTML = `
           <strong>${item.name}</strong>
           <div class="item-meta">
-            <span>Category: ${getCategoryName(item.id)}</span>
+            <span>Category: ${item.categoryName ?? 'Classified'}</span>
             <span>Power +${item.power}</span>
             <span>Cost ${formatCredits(item.cost)}</span>
             <span>Research ${item.research}</span>
@@ -697,16 +912,6 @@
         `;
         selectedLoadout.appendChild(container);
       });
-    }
-
-    function getCategoryName(itemId) {
-      for (const category of categories) {
-        const found = category.items.find(item => item.id === itemId);
-        if (found) {
-          return category.name;
-        }
-      }
-      return 'Unknown';
     }
 
     function getTotalPower() {
@@ -736,13 +941,36 @@
 
     function renderLeaderboard() {
       leaderboardBody.innerHTML = '';
+      if (!currentLeaderboard.length) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.className = 'empty';
+        const emptyCell = document.createElement('td');
+        emptyCell.colSpan = 6;
+        emptyCell.textContent = 'No leaderboard entries yet. Run a scenario to secure the top rank.';
+        emptyRow.appendChild(emptyCell);
+        leaderboardBody.appendChild(emptyRow);
+        return;
+      }
+
       currentLeaderboard.forEach((entry, idx) => {
         const row = document.createElement('tr');
+        if (entry.commander === 'You') {
+          row.classList.add('player-row');
+        }
+        let scoreText = '—';
+        if (Number.isFinite(entry.score)) {
+          scoreText = formatScore(entry.score);
+        } else if (Number.isFinite(entry.efficiency)) {
+          scoreText = `${entry.efficiency}%`;
+        }
+        const outcomeText = mergeOutcomeText(entry);
         row.innerHTML = `
           <td>${idx + 1}</td>
           <td>${entry.commander}</td>
-          <td>${entry.level}</td>
-          <td>${entry.efficiency}%</td>
+          <td>${scoreText}</td>
+          <td>${entry.method ?? '—'}</td>
+          <td>${entry.mission ?? '—'}</td>
+          <td>${outcomeText}</td>
         `;
         leaderboardBody.appendChild(row);
       });
@@ -754,22 +982,42 @@
       const totalPower = getTotalPower();
       const mitigationRatio = Math.min(totalPower / level.requiredPower, 1.35);
       const prevented = Math.round(level.baseDamage * mitigationRatio);
-      const spent = Math.max(0, (state.initialCredits - state.credits) * 1000);
+      const creditsSpent = Math.max(0, state.initialCredits - state.credits);
+      const spent = creditsSpent * 1000;
       const efficiency = spent > 0 ? Math.round((prevented / spent) * 100) : 0;
 
       damagePreventedEl.textContent = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(prevented) + ' lives saved';
-      missionCostEl.textContent = formatCredits(spent / 1000);
-      costEfficiencyEl.textContent = efficiency ? efficiency + ' %' : '—';
+      missionCostEl.textContent = formatCredits(creditsSpent);
+      costEfficiencyEl.textContent = efficiency ? `${efficiency} %` : '—';
 
-      currentLeaderboard = [
-        ...leaderboard.filter(entry => entry.commander !== 'You'),
-        { commander: 'You', level: level.name, efficiency }
-      ].sort((a, b) => b.efficiency - a.efficiency);
+      const outcomeBase = spent === 0
+        ? 'Training Run'
+        : (efficiency >= 100 ? 'Success' : (efficiency > 0 ? 'Partial' : 'Needs Review'));
+
+      const simulatedEntry = {
+        commander: 'You',
+        mission: level.name,
+        method: 'Custom Loadout',
+        score: prevented,
+        efficiency,
+        outcome: outcomeBase
+      };
+
+      const baseEntries = leaderboard.filter(entry => entry.commander !== 'You');
+      currentLeaderboard = [...baseEntries, simulatedEntry]
+        .sort((a, b) => getComparableScore(b) - getComparableScore(a));
 
       renderLeaderboard();
 
       const simulatedRank = currentLeaderboard.findIndex(entry => entry.commander === 'You');
       leaderboardRankEl.textContent = simulatedRank >= 0 ? '#' + (simulatedRank + 1) : '—';
+
+      const defensePlan = buildDefensePlan(level, { prevented, spent, efficiency, totalPower });
+      syncDefensePlan(defensePlan);
+
+      if (leaderboardStatus) {
+        leaderboardStatus.textContent = 'Defense plan synced — your run has been ranked above.';
+      }
 
       runScenarioButton.textContent = 'Scenario Complete';
       state.scenarioComplete = true;
@@ -802,6 +1050,7 @@
     renderLoadout();
     resetResultsDisplay();
     renderLeaderboard();
+    loadLeaderboard();
     updateLaunchState();
     syncStartButtons();
   </script>

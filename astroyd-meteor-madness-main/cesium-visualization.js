@@ -153,10 +153,21 @@ function runCesium(containerId) {
       visualizationEntities: new Set(),
       craterEntities: new Set(),
       neoEntities: new Set(),
+      defenseEntities: new Set(),
       isShowingCrater: false
     };
 
     let currentSimulation = normalizeSimulationPayload(window.getImpactSettings ? window.getImpactSettings() : null);
+
+    let latestDefensePlan = window.__latestDefensePlan || null;
+    let hasFocusedOnDefensePlan = false;
+
+    const defenseColors = {
+      lasers: Cesium.Color.fromCssColorString('#7b1fa2'),
+      kinetics: Cesium.Color.fromCssColorString('#f97316'),
+      craft: Cesium.Color.fromCssColorString('#0ea5e9'),
+      shields: Cesium.Color.fromCssColorString('#22c55e')
+    };
 
     const neoState = {
       data: [],
@@ -226,6 +237,19 @@ function runCesium(containerId) {
         applySimulationState(window.getImpactSettings ? window.getImpactSettings() : null);
       }
       createDangerZones();
+    });
+
+    window.addEventListener('defenseStrategyUpdated', (event) => {
+      const plan = event?.detail?.plan ?? event?.detail ?? null;
+      if (!plan || !Array.isArray(plan.loadout) || plan.loadout.length === 0) {
+        clearDefenseEntities();
+        latestDefensePlan = null;
+        hasFocusedOnDefensePlan = false;
+        return;
+      }
+      const metaSource = event?.detail?.meta?.source;
+      const shouldFlyTo = metaSource === 'storage' || metaSource === 'bootstrap';
+      renderDefensePlan(plan, { flyTo: shouldFlyTo });
     });
 
     const neoToggleButton = document.getElementById('neoToggleButton');
@@ -784,11 +808,145 @@ function runCesium(containerId) {
           !state.visualizationEntities.has(entity) &&
           !state.craterEntities.has(entity) &&
           !state.neoEntities.has(entity) &&
+          !state.defenseEntities.has(entity) &&
           entity !== asteroidEntity
         ) {
           viewer.entities.remove(entity);
         }
       });
+    }
+
+    function clearDefenseEntities() {
+      state.defenseEntities.forEach(entity => viewer.entities.remove(entity));
+      state.defenseEntities.clear();
+    }
+
+    function renderDefensePlan(plan, { flyTo = false } = {}) {
+      clearDefenseEntities();
+
+      if (!plan || !Array.isArray(plan.loadout) || plan.loadout.length === 0) {
+        if (!plan) {
+          latestDefensePlan = null;
+        }
+        hasFocusedOnDefensePlan = false;
+        return;
+      }
+
+      latestDefensePlan = plan;
+
+      const locationSource = plan.level?.impactLocation || plan.level?.location || plan.level || {};
+      const baseLat = toNumber(locationSource.latitude, impact_location.latitude);
+      const baseLon = toNumber(locationSource.longitude, impact_location.longitude);
+      const baseElevation = toNumber(locationSource.elevation, impact_location.elevation);
+      const anchorPosition = Cesium.Cartesian3.fromDegrees(baseLon, baseLat, Math.max(baseElevation + 1000, 1000));
+
+      const anchor = viewer.entities.add({
+        position: anchorPosition,
+        point: {
+          pixelSize: 12,
+          color: Cesium.Color.CYAN.withAlpha(0.85),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 1.5
+        },
+        label: {
+          text: plan.level?.name ? `${plan.level.name} Defense` : 'Defense Target',
+          font: '15px "Roboto", sans-serif',
+          fillColor: Cesium.Color.CYAN,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -16),
+          translucencyByDistance: new Cesium.NearFarScalar(75000, 0.0, 2500000, 1.0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        description: plan.level?.name
+          ? `Coordinated defense response for ${plan.level.name}.`
+          : 'Coordinated defense response.'
+      });
+      state.defenseEntities.add(anchor);
+
+      const lonScale = Math.max(Math.cos(Cesium.Math.toRadians(baseLat)), 0.3);
+      const baseRadiusKm = Math.max(plan.totals?.power ?? 0, 1) * 1.6;
+      let referenceLaunch = null;
+
+      plan.loadout.forEach((item, index) => {
+        const angle = (index / plan.loadout.length) * TWO_PI;
+        const ringKm = baseRadiusKm + (index % 4) * 45;
+        const latOffset = (ringKm / 110.574) * Math.sin(angle);
+        const lonOffset = (ringKm / (111.32 * lonScale)) * Math.cos(angle);
+        const assetLat = clamp(baseLat + latOffset, -85, 85);
+        const assetLon = baseLon + lonOffset;
+        const altitude = item.categoryId === 'lasers'
+          ? 750000
+          : item.categoryId === 'kinetics'
+            ? 460000
+            : item.categoryId === 'craft'
+              ? 320000
+              : item.categoryId === 'shields'
+                ? 160000
+                : 220000;
+        const position = Cesium.Cartesian3.fromDegrees(assetLon, assetLat, altitude);
+        const color = (item.categoryId && defenseColors[item.categoryId]) || Cesium.Color.SKYBLUE;
+
+        const defenseNode = viewer.entities.add({
+          position,
+          point: {
+            pixelSize: 14,
+            color: color.withAlpha(0.95),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 1.5
+          },
+          label: {
+            text: item.name || item.id,
+            font: '13px "Roboto", sans-serif',
+            fillColor: color,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -18),
+            translucencyByDistance: new Cesium.NearFarScalar(150000, 0.0, 3000000, 1.0),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          description: `Category: ${item.categoryName || item.categoryId || 'Unknown'}<br>`
+            + `Power: ${item.power ?? '—'}`
+        });
+        state.defenseEntities.add(defenseNode);
+
+        const connection = viewer.entities.add({
+          polyline: {
+            positions: [position, anchorPosition],
+            width: 2.2,
+            material: new Cesium.ColorMaterialProperty(color.withAlpha(0.6))
+          }
+        });
+        state.defenseEntities.add(connection);
+
+        if (!referenceLaunch) {
+          referenceLaunch = { lon: assetLon, lat: assetLat, alt: altitude };
+        }
+      });
+
+      if (referenceLaunch) {
+        impact_location.launch_longitude = referenceLaunch.lon;
+        impact_location.launch_latitude = referenceLaunch.lat;
+        impact_location.launch_altitude = referenceLaunch.alt;
+      }
+
+      if (!hasFocusedOnDefensePlan || flyTo) {
+        viewer.flyTo(Array.from(state.defenseEntities), {
+          duration: 2.6,
+          offset: new Cesium.HeadingPitchRange(
+            0,
+            Cesium.Math.toRadians(-35),
+            1200000
+          )
+        }).catch((error) => {
+          console.warn('Failed to focus defense plan', error);
+        });
+        hasFocusedOnDefensePlan = true;
+      }
     }
 
     // Danger zones visualization
@@ -827,6 +985,10 @@ function runCesium(containerId) {
     }
 
     createDangerZones();
+
+    if (latestDefensePlan && state.defenseEntities.size === 0) {
+      renderDefensePlan(latestDefensePlan, { flyTo: true });
+    }
 
     // Create permanent crater
     function createCrater() {

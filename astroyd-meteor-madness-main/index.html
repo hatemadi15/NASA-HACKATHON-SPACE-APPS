@@ -385,6 +385,57 @@
     const api = new MeteorMadnessAPI();
     let cachedHistory = [];
 
+    const DEFENSE_PLAN_STORAGE_KEY = 'defensePlanner:lastConfiguration';
+
+    const safeParseJson = (value) => {
+      if (typeof value !== 'string' || !value.length) {
+        return null;
+      }
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        console.warn('Failed to parse defense plan payload', error);
+        return null;
+      }
+    };
+
+    const dispatchDefensePlanUpdate = (plan, meta = {}) => {
+      if (!plan || typeof plan !== 'object') {
+        return;
+      }
+      window.__latestDefensePlan = plan;
+      window.dispatchEvent(new CustomEvent('defenseStrategyUpdated', {
+        detail: {
+          plan,
+          meta: {
+            ...meta,
+            receivedAt: Date.now()
+          }
+        }
+      }));
+    };
+
+    const bootstrapDefensePlanSync = () => {
+      if (typeof localStorage === 'undefined') {
+        return;
+      }
+      const cachedPlan = localStorage.getItem(DEFENSE_PLAN_STORAGE_KEY);
+      const parsed = safeParseJson(cachedPlan);
+      if (parsed) {
+        dispatchDefensePlanUpdate(parsed, { source: 'bootstrap' });
+      }
+    };
+
+    window.addEventListener('storage', (event) => {
+      if (event.key !== DEFENSE_PLAN_STORAGE_KEY || !event.newValue) {
+        return;
+      }
+      const parsed = safeParseJson(event.newValue);
+      if (parsed) {
+        dispatchDefensePlanUpdate(parsed, { source: 'storage' });
+      }
+    });
+
     const damageMetricsContainer = document.getElementById('damageMetrics');
     const damageMetricsContent = document.getElementById('damageMetricsContent');
     const defaultDamageMetricsMessage = damageMetricsContent
@@ -850,6 +901,7 @@
     //     }
     // });
 
+    bootstrapDefensePlanSync();
     checkBackendConnection();
     setupCesiumVisualization('cesiumContainer');
 
