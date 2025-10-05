@@ -259,6 +259,8 @@
         <option value="forest">Forest</option>
         <option value="ice">Ice</option>
       </select><br>
+      <label for="population_density">Population Density (people/km²):</label>
+      <input type="number" id="population_density" name="population_density" step="1" value="0" style="width:80px;margin-bottom:8px"><br>
       <hr style="margin:12px 0">
       <label for="asteroid_size">Asteroid Size (m):</label>
       <input type="number" id="asteroid_size" name="asteroid_size" step="1" value="50" style="width:80px;margin-bottom:8px"><br>
@@ -299,6 +301,7 @@
   <button id="cameraToggleButton">Follow Asteroid</button>
   <button id="neoToggleButton" type="button">Show NEOs</button>
   <button id="launchButton" type="button">Launch Simulation</button>
+  <button id="advanced-calculation" type="button" style="position:absolute;top:10px;left:600px;z-index:1000;padding:10px 20px;background:rgba(34,139,34,0.85);border:none;color:white;cursor:pointer;border-radius:4px;font-size:14px;">Advanced Metrics</button>
   <script type="module">
     import { setupCesiumVisualization } from './cesium-visualization.js';
     import { MeteorMadnessAPI } from './api-client.js';
@@ -308,6 +311,15 @@
         return structuredClone(value);
       }
       return JSON.parse(JSON.stringify(value));
+    };
+
+    const getNumericValue = (elementId, fallback = 0) => {
+      const element = document.getElementById(elementId);
+      if (!element) {
+        return fallback;
+      }
+      const parsed = parseFloat(element.value);
+      return Number.isFinite(parsed) ? parsed : fallback;
     };
 
     const DEFAULT_SIMULATION = {
@@ -483,6 +495,11 @@
 
         const latestImpactResult = latestSimulation.impactResult || {};
 
+        const populationInputField = document.getElementById('population_density');
+        if (populationInputField && typeof latestSimulation.location.population_density === 'number') {
+          populationInputField.value = String(Math.round(latestSimulation.location.population_density * 100) / 100);
+        }
+
         if (typeof latestImpactResult.crater_diameter === 'number') {
           document.getElementById('crater_diameter').value = latestImpactResult.crater_diameter;
         }
@@ -523,6 +540,93 @@
         launchButton.disabled = false;
       }
     });
+
+    const advancedCalculationButton = document.getElementById('advanced-calculation');
+    const populationDensityInput = document.getElementById('population_density');
+
+    if (advancedCalculationButton) {
+      advancedCalculationButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+
+        const originalText = advancedCalculationButton.textContent;
+        advancedCalculationButton.textContent = 'Calculating...';
+        advancedCalculationButton.disabled = true;
+
+        const latitude = getNumericValue('latitude', latestSimulation.location.latitude);
+        const longitude = getNumericValue('longitude', latestSimulation.location.longitude);
+        const elevation = getNumericValue('elevation', latestSimulation.location.elevation);
+        const terrainSelect = document.getElementById('terrain_type');
+        const terrainType = terrainSelect ? terrainSelect.value : latestSimulation.location.terrain_type;
+        let populationDensity = getNumericValue('population_density', latestSimulation.location.population_density || 0);
+
+        try {
+          const fetchedDensity = await api.getPopulationDensity(latitude, longitude);
+          if (typeof fetchedDensity === 'number' && Number.isFinite(fetchedDensity)) {
+            populationDensity = fetchedDensity;
+            if (populationDensityInput) {
+              populationDensityInput.value = String(Math.round(fetchedDensity * 100) / 100);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch population density from NASA API:', error);
+        }
+
+        latestSimulation.location.population_density = populationDensity;
+
+        const asteroidData = {
+          diameter: getNumericValue('asteroid_size', latestSimulation.asteroid.diameter),
+          mass: getNumericValue('asteroid_mass', latestSimulation.asteroid.mass),
+          velocity: getNumericValue('asteroid_speed', latestSimulation.asteroid.velocity),
+          density: getNumericValue('asteroid_density', latestSimulation.asteroid.density),
+          impact_angle: getNumericValue('impact_angle', latestSimulation.asteroid.impact_angle),
+          composition: document.getElementById('composition')?.value || latestSimulation.asteroid.composition
+        };
+
+        const impactLocation = {
+          latitude,
+          longitude,
+          elevation,
+          terrain_type: terrainType,
+          population_density: populationDensity,
+          infrastructure_density: latestSimulation.location.infrastructure_density || 0
+        };
+
+        try {
+          const advancedResult = await api.calculateAdvancedImpact(asteroidData, impactLocation, { useNasaPopulation: true });
+
+          const resolvedDensity = typeof advancedResult?.population_density === 'number'
+            ? advancedResult.population_density
+            : (advancedResult?.impact_location?.population_density ?? populationDensity);
+
+          if (typeof resolvedDensity === 'number' && Number.isFinite(resolvedDensity)) {
+            latestSimulation.location.population_density = resolvedDensity;
+            if (populationDensityInput) {
+              populationDensityInput.value = String(Math.round(resolvedDensity * 100) / 100);
+            }
+          }
+
+          window.dispatchEvent(new CustomEvent('advancedImpactCalculated', { detail: clone(advancedResult) }));
+
+          const statusEl = document.getElementById('status');
+          if (statusEl) {
+            statusEl.textContent = 'Advanced metrics calculated!';
+            statusEl.style.color = 'green';
+          }
+
+          console.log('Advanced metrics result:', advancedResult);
+        } catch (error) {
+          console.error('Advanced impact calculation failed:', error);
+          const statusEl = document.getElementById('status');
+          if (statusEl) {
+            statusEl.textContent = 'Advanced metrics calculation failed';
+            statusEl.style.color = 'red';
+          }
+        } finally {
+          advancedCalculationButton.textContent = originalText;
+          advancedCalculationButton.disabled = false;
+        }
+      });
+    }
 
     window.getImpactSettings = () => clone(latestSimulation);
 
