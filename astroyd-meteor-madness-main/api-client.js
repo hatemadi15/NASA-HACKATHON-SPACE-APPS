@@ -90,7 +90,9 @@ class MeteorMadnessAPI {
                 longitude: impactLocation.longitude,
                 elevation: impactLocation.elevation || 0,
                 terrain_type: impactLocation.terrain_type || "land",
-                population_density: impactLocation.population_density || 0
+                population_density: impactLocation.population_density || 0,
+                infrastructure_density: impactLocation.infrastructure_density || 0,
+                water_depth: impactLocation.water_depth || null
             },
             use_nasa_data: options.useNasaData || false,
             use_ml: options.useML || false,
@@ -99,6 +101,48 @@ class MeteorMadnessAPI {
         };
 
         return this._fetch(`${this.baseURL}/simulation/simulate`, {
+            method: 'POST',
+            body: JSON.stringify(requestData)
+        });
+    }
+
+    async calculateAdvancedImpact(asteroidData, impactLocation, calculationOptions = {}) {
+        const requestData = {
+            asteroid: {
+                diameter: asteroidData.diameter || asteroidData.size,
+                mass: asteroidData.mass,
+                velocity: asteroidData.velocity || asteroidData.speed,
+                density: asteroidData.density,
+                impact_angle: asteroidData.impact_angle,
+                composition: asteroidData.composition || "iron"
+            },
+            impact_location: {
+                latitude: impactLocation.latitude,
+                longitude: impactLocation.longitude,
+                elevation: impactLocation.elevation || 0,
+                terrain_type: impactLocation.terrain_type || "land",
+                population_density: impactLocation.population_density || 0,
+                infrastructure_density: impactLocation.infrastructure_density || 0,
+                water_depth: impactLocation.water_depth || null
+            },
+            options: {
+                calculate_human_casualties: calculationOptions.calculateHumanCasualties !== undefined ? calculationOptions.calculateHumanCasualties : true,
+                calculate_infrastructure_damage: calculationOptions.calculateInfrastructureDamage !== undefined ? calculationOptions.calculateInfrastructureDamage : true,
+                calculate_environmental_impact: calculationOptions.calculateEnvironmentalImpact !== undefined ? calculationOptions.calculateEnvironmentalImpact : true,
+                calculate_economic_impact: calculationOptions.calculateEconomicImpact !== undefined ? calculationOptions.calculateEconomicImpact : true,
+                calculate_damage_assessment: calculationOptions.calculateDamageAssessment !== undefined ? calculationOptions.calculateDamageAssessment : true,
+                calculate_kinetic_energy: calculationOptions.calculateKineticEnergy !== undefined ? calculationOptions.calculateKineticEnergy : true,
+                calculate_atmospheric_entry: calculationOptions.calculateAtmosphericEntry !== undefined ? calculationOptions.calculateAtmosphericEntry : true,
+                calculate_crater_formation: calculationOptions.calculateCraterFormation !== undefined ? calculationOptions.calculateCraterFormation : true,
+                calculate_blast_effects: calculationOptions.calculateBlastEffects !== undefined ? calculationOptions.calculateBlastEffects : true,
+                calculate_tsunami_effects: calculationOptions.calculateTsunamiEffects !== undefined ? calculationOptions.calculateTsunamiEffects : true,
+                recalculate_evacuation_radius: calculationOptions.recalculateEvacuationRadius !== undefined ? calculationOptions.recalculateEvacuationRadius : true,
+                calculate_impact_result: calculationOptions.calculateImpactResult !== undefined ? calculationOptions.calculateImpactResult : true,
+                use_ml_enhancer: calculationOptions.useMlEnhancer || false
+            }
+        };
+
+        return this._fetch(`${this.baseURL}/simulation/calculate/advanced`, {
             method: 'POST',
             body: JSON.stringify(requestData)
         });
