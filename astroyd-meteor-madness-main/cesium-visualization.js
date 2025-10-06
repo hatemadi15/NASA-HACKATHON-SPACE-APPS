@@ -81,6 +81,25 @@ function runCesium(containerId) {
       composition: 'stony'
     };
 
+    const clone = (value) => {
+      if (typeof structuredClone === 'function') {
+        try {
+          return structuredClone(value);
+        } catch (error) {
+          console.warn('Failed to structuredClone value, falling back to JSON clone', error);
+        }
+      }
+      if (value === null || value === undefined) {
+        return value;
+      }
+      try {
+        return JSON.parse(JSON.stringify(value));
+      } catch (jsonError) {
+        console.warn('Failed to JSON clone value', jsonError);
+        return value;
+      }
+    };
+
     const normalizeSimulationPayload = (raw) => {
       if (!raw) {
         return {
@@ -153,10 +172,27 @@ function runCesium(containerId) {
       visualizationEntities: new Set(),
       craterEntities: new Set(),
       neoEntities: new Set(),
+      defenseEntities: new Set(),
       isShowingCrater: false
     };
 
     let currentSimulation = normalizeSimulationPayload(window.getImpactSettings ? window.getImpactSettings() : null);
+
+    let latestDefensePlan = window.__latestDefensePlan || null;
+    let latestDefenseOutcome = null;
+    let hasFocusedOnDefensePlan = false;
+    let cameraMode = 'impact';
+    let asteroidEntity = null;
+    let pendingDefenseAutoFollow = false;
+    let defenseOverlayEnabled = Boolean(window.defenseOverlayEnabled);
+    let latestImpactSelectionId = 0;
+
+    const defenseColors = {
+      lasers: Cesium.Color.fromCssColorString('#7b1fa2'),
+      kinetics: Cesium.Color.fromCssColorString('#f97316'),
+      craft: Cesium.Color.fromCssColorString('#0ea5e9'),
+      shields: Cesium.Color.fromCssColorString('#22c55e')
+    };
 
     const neoState = {
       data: [],
@@ -182,6 +218,176 @@ function runCesium(containerId) {
       impact_location.latitude,
       impact_location.elevation
     );
+
+    const IMPACT_MARKER_ID = 'impact-location-marker';
+    let impactMarkerEntity = viewer.entities.add({
+      id: IMPACT_MARKER_ID,
+      position: impactCartesian,
+      point: {
+        pixelSize: 18,
+        color: Cesium.Color.RED,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      description: 'Selected Impact Location'
+    });
+    state.visualizationEntities.add(impactMarkerEntity);
+
+    const updateImpactMarker = (position) => {
+      if (!position) {
+        return;
+      }
+      let marker = viewer.entities.getById(IMPACT_MARKER_ID);
+      if (!marker) {
+        marker = viewer.entities.add({
+          id: IMPACT_MARKER_ID,
+          position,
+          point: {
+            pixelSize: 18,
+            color: Cesium.Color.RED,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2,
+            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          description: 'Selected Impact Location'
+        });
+      } else {
+        marker.position = position;
+      }
+      impactMarkerEntity = marker;
+      state.visualizationEntities.add(marker);
+    };
+
+    const pickGlobePosition = (clickPosition) => {
+      if (!clickPosition) {
+        return null;
+      }
+      const scene = viewer.scene;
+      if (!scene) {
+        return null;
+      }
+      let pickedPosition = null;
+      try {
+        pickedPosition = scene.pickPosition(clickPosition);
+      } catch (error) {
+        console.warn('pickPosition failed, attempting ray pick', error);
+      }
+      if (!Cesium.defined(pickedPosition)) {
+        const ray = viewer.camera.getPickRay(clickPosition);
+        if (!ray) {
+          return null;
+        }
+        pickedPosition = scene.globe.pick(ray, scene);
+      }
+      return Cesium.defined(pickedPosition) ? pickedPosition : null;
+    };
+
+    const applyManualImpactSelection = async (cartographic) => {
+      if (!cartographic) {
+        return;
+      }
+      latestImpactSelectionId += 1;
+      const selectionId = latestImpactSelectionId;
+      const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+      const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+      const elevation = cartographic.height ?? 0;
+
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(elevation)) {
+        return;
+      }
+
+      let populationDensity = 0;
+
+      impact_location = {
+        ...impact_location,
+        latitude,
+        longitude,
+        elevation,
+        population_density: populationDensity
+      };
+
+      impactCartesian = Cesium.Cartesian3.fromDegrees(longitude, latitude, elevation);
+      updateImpactMarker(impactCartesian);
+
+      const latitudeInput = document.getElementById('latitude');
+      if (latitudeInput) {
+        latitudeInput.value = latitude.toFixed(6);
+      }
+      const longitudeInput = document.getElementById('longitude');
+      if (longitudeInput) {
+        longitudeInput.value = longitude.toFixed(6);
+      }
+      const elevationInput = document.getElementById('elevation');
+      if (elevationInput) {
+        elevationInput.value = elevation.toFixed(2);
+      }
+      const populationDensityInput = document.getElementById('population_density');
+      if (populationDensityInput) {
+        populationDensityInput.value = '';
+      }
+      try {
+        if (window?.meteorMadnessAPI?.getPopulationDensity) {
+          const fetchedDensity = await window.meteorMadnessAPI.getPopulationDensity(latitude, longitude);
+          if (typeof fetchedDensity === 'number' && Number.isFinite(fetchedDensity)) {
+            populationDensity = fetchedDensity;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch population density for selected impact location', error);
+      }
+       if (selectionId !== latestImpactSelectionId) {
+        return;
+      }
+
+
+      impact_location = {
+        ...impact_location,
+        population_density: populationDensity
+      };
+
+      if (populationDensityInput) {
+        populationDensityInput.value = String(Math.round(populationDensity * 100) / 100);
+      }
+
+
+      const updatedSimulation = {
+        ...currentSimulation,
+        location: {
+          ...currentSimulation.location,
+          latitude,
+          longitude,
+          elevation,
+          population_density: populationDensity
+        }
+      };
+
+      currentSimulation = updatedSimulation;
+
+      window.dispatchEvent(new CustomEvent('impactSettingsChanged', {
+        detail: clone(updatedSimulation)
+      }));
+    };
+
+    const screenSpaceHandler = viewer.screenSpaceEventHandler
+      || new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+    screenSpaceHandler.setInputAction((movement) => {
+      if (defenseOverlayEnabled) {
+        return;
+      }
+      const cartesian = pickGlobePosition(movement?.position);
+      if (!cartesian) {
+        return;
+      }
+      const cartographic = Cesium.Ellipsoid.WGS84.cartesianToCartographic(cartesian);
+      if (!cartographic) {
+        return;
+      }
+      applyManualImpactSelection(cartographic);
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     function applySimulationState(payload) {
       if (payload) {
@@ -213,6 +419,86 @@ function runCesium(containerId) {
       console.log('impactSettingsChanged event received', event.detail);
       applySimulationState(event.detail);
       createDangerZones();
+    });
+
+    window.addEventListener('advancedImpactCalculated', (event) => {
+      const detail = event?.detail;
+      if (detail?.settingsDispatched) {
+        return;
+      }
+      if (detail?.simulation) {
+        applySimulationState(detail.simulation);
+      } else {
+        applySimulationState(window.getImpactSettings ? window.getImpactSettings() : null);
+      }
+      createDangerZones();
+    });
+
+    window.addEventListener('defenseOverlayPreferenceChanged', (event) => {
+      defenseOverlayEnabled = Boolean(event?.detail?.enabled);
+      if (!defenseOverlayEnabled) {
+        clearDefenseEntities();
+        hasFocusedOnDefensePlan = false;
+        pendingDefenseAutoFollow = false;
+        return;
+      }
+      if (latestDefensePlan && Array.isArray(latestDefensePlan.loadout) && latestDefensePlan.loadout.length) {
+        renderDefensePlan(latestDefensePlan, { flyTo: false });
+      }
+    });
+
+    window.addEventListener('defenseStrategyUpdated', (event) => {
+      const detail = event?.detail ?? {};
+      const plan = detail?.plan ?? detail ?? null;
+      if (!plan || !Array.isArray(plan.loadout) || plan.loadout.length === 0) {
+        latestDefensePlan = null;
+        clearDefenseEntities();
+        hasFocusedOnDefensePlan = false;
+        pendingDefenseAutoFollow = false;
+        return;
+      }
+
+      latestDefensePlan = plan;
+
+      const meta = detail.meta ?? {};
+      const metaSource = meta.source ?? detail.source ?? null;
+      const autoFollowSources = ['storage', 'bootstrap', 'defense-planner'];
+      const shouldAutoFollow = meta.autoFollow === true
+        || (metaSource ? autoFollowSources.includes(metaSource) : false);
+      const shouldFlyTo = shouldAutoFollow || meta.flyTo === true;
+      const forceVisualization = meta.forceVisualization === true;
+      const shouldRenderDefense = (defenseOverlayEnabled || forceVisualization)
+        && Array.isArray(plan.loadout)
+        && plan.loadout.length > 0;
+
+      if (!shouldRenderDefense) {
+        clearDefenseEntities();
+        hasFocusedOnDefensePlan = false;
+        pendingDefenseAutoFollow = false;
+        return;
+      }
+
+      renderDefensePlan(plan, { flyTo: shouldFlyTo });
+
+      if (shouldAutoFollow || forceVisualization) {
+        pendingDefenseAutoFollow = true;
+      }
+
+      if (pendingDefenseAutoFollow) {
+        pendingDefenseAutoFollow = false;
+        cameraMode = 'asteroid';
+        const cameraToggleButton = document.getElementById('cameraToggleButton');
+        if (cameraToggleButton) {
+          cameraToggleButton.textContent = 'Focus Impact';
+        }
+        try {
+          resetSimulation({
+            forceDefenseVisualization: forceVisualization && !defenseOverlayEnabled
+          });
+        } catch (error) {
+          console.warn('Failed to auto-launch defense visualization', error);
+        }
+      }
     });
 
     const neoToggleButton = document.getElementById('neoToggleButton');
@@ -771,6 +1057,7 @@ function runCesium(containerId) {
           !state.visualizationEntities.has(entity) &&
           !state.craterEntities.has(entity) &&
           !state.neoEntities.has(entity) &&
+          !state.defenseEntities.has(entity) &&
           entity !== asteroidEntity
         ) {
           viewer.entities.remove(entity);
@@ -778,23 +1065,323 @@ function runCesium(containerId) {
       });
     }
 
+    function clearDefenseEntities() {
+      state.defenseEntities.forEach(entity => viewer.entities.remove(entity));
+      state.defenseEntities.clear();
+      latestDefenseOutcome = null;
+      pendingDefenseAutoFollow = false;
+    }
+
+    function renderDefensePlan(plan, { flyTo = false } = {}) {
+      clearDefenseEntities();
+
+      if (!plan || !Array.isArray(plan.loadout) || plan.loadout.length === 0) {
+        if (!plan) {
+          latestDefensePlan = null;
+        }
+        latestDefenseOutcome = null;
+        hasFocusedOnDefensePlan = false;
+        return;
+      }
+
+      latestDefensePlan = plan;
+      latestDefenseOutcome = plan.engagement || null;
+
+      const locationSource = plan.level?.impactLocation || plan.level?.location || plan.level || {};
+      const baseLat = toNumber(locationSource.latitude, impact_location.latitude);
+      const baseLon = toNumber(locationSource.longitude, impact_location.longitude);
+      const baseElevation = toNumber(locationSource.elevation, impact_location.elevation);
+
+      impact_location.latitude = baseLat;
+      impact_location.longitude = baseLon;
+      impact_location.elevation = baseElevation;
+      impactCartesian = Cesium.Cartesian3.fromDegrees(baseLon, baseLat, Math.max(baseElevation, 0));
+      updateImpactMarker(impactCartesian);
+      currentSimulation = {
+        ...currentSimulation,
+        location: {
+          ...currentSimulation.location,
+          latitude: baseLat,
+          longitude: baseLon,
+          elevation: baseElevation
+        }
+      };
+      const engagement = plan.engagement || {};
+
+      if (engagement.approachPoint) {
+        impact_location.launch_longitude = toNumber(engagement.approachPoint.longitude, impact_location.launch_longitude);
+        impact_location.launch_latitude = toNumber(engagement.approachPoint.latitude, impact_location.launch_latitude);
+        impact_location.launch_altitude = toNumber(engagement.approachPoint.altitude, impact_location.launch_altitude);
+      }
+
+      if (engagement.interceptPoint) {
+        impact_location.intercept_longitude = toNumber(engagement.interceptPoint.longitude, impact_location.longitude);
+        impact_location.intercept_latitude = toNumber(engagement.interceptPoint.latitude, impact_location.latitude);
+        impact_location.intercept_altitude = toNumber(engagement.interceptPoint.altitude, impact_location.launch_altitude);
+      } else {
+        delete impact_location.intercept_longitude;
+        delete impact_location.intercept_latitude;
+        delete impact_location.intercept_altitude;
+      }
+
+      const anchorPosition = Cesium.Cartesian3.fromDegrees(baseLon, baseLat, Math.max(baseElevation + 1000, 1000));
+      const accuracySuffix = Number.isFinite(engagement.accuracy) ? ` (${Math.round(engagement.accuracy)}% accuracy)` : '';
+      const anchorLabel = plan.level?.name
+        ? `${plan.level.name} Defense${accuracySuffix}`
+        : `Defense Target${accuracySuffix}`;
+      const anchorDescription = engagement?.summary
+        || (engagement && Number.isFinite(engagement.accuracy)
+          ? (engagement.success
+            ? `Intercept corridor secured with ${Math.round(engagement.accuracy)}% projected accuracy.`
+            : `Defense response staged · Accuracy ${Math.round(engagement.accuracy)}%.`)
+          : (plan.level?.name
+            ? `Coordinated defense response for ${plan.level.name}.`
+            : 'Coordinated defense response.'));
+
+      const anchor = viewer.entities.add({
+        position: anchorPosition,
+        point: {
+          pixelSize: 12,
+          color: Cesium.Color.CYAN.withAlpha(0.85),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 1.5
+        },
+        label: {
+          text: anchorLabel,
+          font: '15px "Roboto", sans-serif',
+          fillColor: Cesium.Color.CYAN,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -16),
+          translucencyByDistance: new Cesium.NearFarScalar(75000, 0.0, 2500000, 1.0),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        description: anchorDescription
+      });
+      state.defenseEntities.add(anchor);
+
+      const lonScale = Math.max(Math.cos(Cesium.Math.toRadians(baseLat)), 0.3);
+      const baseRadiusKm = Math.max(plan.totals?.power ?? 0, 1) * 1.6;
+      let referenceLaunch = null;
+      const assetPositions = [];
+
+      plan.loadout.forEach((item, index) => {
+        const angle = (index / plan.loadout.length) * TWO_PI;
+        const ringKm = baseRadiusKm + (index % 4) * 45;
+        const latOffset = (ringKm / 110.574) * Math.sin(angle);
+        const lonOffset = (ringKm / (111.32 * lonScale)) * Math.cos(angle);
+        const assetLat = clamp(baseLat + latOffset, -85, 85);
+        const assetLon = baseLon + lonOffset;
+        const altitude = item.categoryId === 'lasers'
+          ? 750000
+          : item.categoryId === 'kinetics'
+            ? 460000
+            : item.categoryId === 'craft'
+              ? 320000
+              : item.categoryId === 'shields'
+                ? 160000
+                : 220000;
+        const position = Cesium.Cartesian3.fromDegrees(assetLon, assetLat, altitude);
+        const color = (item.categoryId && defenseColors[item.categoryId]) || Cesium.Color.SKYBLUE;
+
+        const defenseNode = viewer.entities.add({
+          position,
+          point: {
+            pixelSize: 14,
+            color: color.withAlpha(0.95),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 1.5
+          },
+          label: {
+            text: item.name || item.id,
+            font: '13px "Roboto", sans-serif',
+            fillColor: color,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -18),
+            translucencyByDistance: new Cesium.NearFarScalar(150000, 0.0, 3000000, 1.0),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          description: `Category: ${item.categoryName || item.categoryId || 'Unknown'}<br>`
+            + `Power: ${item.power ?? '—'}`
+        });
+        state.defenseEntities.add(defenseNode);
+
+        const connection = viewer.entities.add({
+          polyline: {
+            positions: [position, anchorPosition],
+            width: 2.2,
+            material: new Cesium.ColorMaterialProperty(color.withAlpha(0.6))
+          }
+        });
+        state.defenseEntities.add(connection);
+
+        assetPositions.push({ position, color });
+
+        if (!referenceLaunch) {
+          referenceLaunch = { lon: assetLon, lat: assetLat, alt: altitude };
+        }
+      });
+
+      if (referenceLaunch) {
+        impact_location.launch_longitude = referenceLaunch.lon;
+        impact_location.launch_latitude = referenceLaunch.lat;
+        impact_location.launch_altitude = referenceLaunch.alt;
+      }
+
+      const interceptPoint = engagement?.interceptPoint;
+      let interceptPosition = null;
+      if (interceptPoint && Number.isFinite(interceptPoint.longitude) && Number.isFinite(interceptPoint.latitude)) {
+        interceptPosition = Cesium.Cartesian3.fromDegrees(
+          interceptPoint.longitude,
+          interceptPoint.latitude,
+          Math.max(toNumber(interceptPoint.altitude, 0), 50000)
+        );
+        const successColor = engagement?.success ? Cesium.Color.LIME : Cesium.Color.CRIMSON;
+        const interceptLabel = engagement?.success ? 'Intercept Window' : 'Missed Intercept';
+        const interceptNode = viewer.entities.add({
+          position: interceptPosition,
+          point: {
+            pixelSize: 16,
+            color: successColor.withAlpha(0.92),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 2
+          },
+          label: {
+            text: interceptLabel,
+            font: '14px "Roboto", sans-serif',
+            fillColor: successColor,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 1.5,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            pixelOffset: new Cesium.Cartesian2(0, -18),
+            translucencyByDistance: new Cesium.NearFarScalar(200000, 0.0, 4500000, 1.0),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          }
+        });
+        state.defenseEntities.add(interceptNode);
+
+        assetPositions.forEach(({ position, color }) => {
+          const interceptConnector = viewer.entities.add({
+            polyline: {
+              positions: [position, interceptPosition],
+              width: 2.6,
+              material: new Cesium.PolylineArrowMaterialProperty(
+                (engagement?.success ? color : Cesium.Color.CRIMSON).withAlpha(0.65)
+              )
+            }
+          });
+          state.defenseEntities.add(interceptConnector);
+        });
+
+        if (engagement?.success && engagement.deflectionPoint) {
+          const deflectionCartesian = Cesium.Cartesian3.fromDegrees(
+            engagement.deflectionPoint.longitude,
+            engagement.deflectionPoint.latitude,
+            Math.max(toNumber(engagement.deflectionPoint.altitude, 0), 80000)
+          );
+          const deflectionTrail = viewer.entities.add({
+            polyline: {
+              positions: [interceptPosition, deflectionCartesian],
+              width: 3.2,
+              material: new Cesium.PolylineGlowMaterialProperty({
+                glowPower: 0.25,
+                taperPower: 0.4,
+                color: Cesium.Color.LIME.withAlpha(0.8)
+              })
+            }
+          });
+          state.defenseEntities.add(deflectionTrail);
+          const deflectedMarker = viewer.entities.add({
+            position: deflectionCartesian,
+            point: {
+              pixelSize: 10,
+              color: Cesium.Color.AQUA.withAlpha(0.9),
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 1.2
+            },
+            label: {
+              text: 'Asteroid Deflected',
+              font: '13px "Roboto", sans-serif',
+              fillColor: Cesium.Color.AQUA,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 1,
+              pixelOffset: new Cesium.Cartesian2(0, -14),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY
+            }
+          });
+          state.defenseEntities.add(deflectedMarker);
+        } else if (!engagement?.success && engagement?.missPoint) {
+          const missCartesian = Cesium.Cartesian3.fromDegrees(
+            engagement.missPoint.longitude,
+            engagement.missPoint.latitude,
+            Math.max(toNumber(engagement.missPoint.altitude, 0), 30000)
+          );
+          const missPath = viewer.entities.add({
+            polyline: {
+              positions: [interceptPosition, missCartesian, anchorPosition],
+              width: 3.4,
+              material: new Cesium.PolylineGlowMaterialProperty({
+                color: Cesium.Color.RED.withAlpha(0.75),
+                glowPower: 0.2
+              })
+            }
+          });
+          state.defenseEntities.add(missPath);
+        }
+      }
+
+      if (!hasFocusedOnDefensePlan || flyTo) {
+        viewer.flyTo(Array.from(state.defenseEntities), {
+          duration: 2.6,
+          offset: new Cesium.HeadingPitchRange(
+            0,
+            Cesium.Math.toRadians(-35),
+            1200000
+          )
+        }).catch((error) => {
+          console.warn('Failed to focus defense plan', error);
+        });
+        hasFocusedOnDefensePlan = true;
+      }
+    }
     // Danger zones visualization
     function createDangerZones() {
       console.log("createDangerZones called");
-      state.visualizationEntities.forEach(entity => viewer.entities.remove(entity));
+       const preservedEntities = [];
+      state.visualizationEntities.forEach((entity) => {
+        if (!entity) {
+          return;
+        }
+        if (entity.id === IMPACT_MARKER_ID) {
+          preservedEntities.push(entity);
+          return;
+        }
+        viewer.entities.remove(entity);
+      });
       state.visualizationEntities.clear();
+       impactMarkerEntity = viewer.entities.getById(IMPACT_MARKER_ID) || impactMarkerEntity;
+      if (impactMarkerEntity) {
+        impactMarkerEntity.position = impactCartesian;
+        state.visualizationEntities.add(impactMarkerEntity);
+      } else {
+        updateImpactMarker(impactCartesian);
+      }
       const rings = [
         { radius: impact_result.blast_radius, color: Cesium.Color.RED.withAlpha(0.3), name: 'Blast Radius' },
         { radius: impact_result.thermal_radius, color: Cesium.Color.ORANGE.withAlpha(0.2), name: 'Thermal Radius' },
         { radius: impact_result.fireball_radius, color: Cesium.Color.YELLOW.withAlpha(0.2), name: 'Fireball Radius' },
         { radius: impact_result.evacuation_radius, color: Cesium.Color.BLUE.withAlpha(0.1), name: 'Evacuation Radius' }
       ];
-      const impactPoint = viewer.entities.add({
-        position: impactCartesian,
-        point: { pixelSize: 20, color: Cesium.Color.RED },
-        description: 'Impact Point'
+     preservedEntities.forEach((entity) => {
+        if (entity && entity.id === IMPACT_MARKER_ID) {
+          state.visualizationEntities.add(entity);
+        }
       });
-      state.visualizationEntities.add(impactPoint);
       rings.forEach((ring, index) => {
         setTimeout(() => {
           const entity = viewer.entities.add({
@@ -814,6 +1401,10 @@ function runCesium(containerId) {
     }
 
     createDangerZones();
+
+    if (latestDefensePlan && state.defenseEntities.size === 0) {
+      renderDefensePlan(latestDefensePlan, { flyTo: true });
+    }
 
     // Create permanent crater
     function createCrater() {
@@ -896,37 +1487,62 @@ function runCesium(containerId) {
     }
 
     // Asteroid trajectory and impact sequence
-    let cameraMode = 'impact';
-    let asteroidEntity = null;
     function animateAsteroidAndImpact() {
       // Use asteroid speed to affect animation duration and clock multiplier
       // Use asteroid size to affect visual size
       // Use mass/density for future enhancements
       // Use user input for initial launch position
-      const startLon = isFiniteNumber(impact_location.launch_longitude)
-        ? impact_location.launch_longitude
-        : (impact_location.longitude - 5);
-      const startLat = isFiniteNumber(impact_location.launch_latitude)
-        ? impact_location.launch_latitude
-        : (impact_location.latitude - 5);
-      const startAlt = isFiniteNumber(impact_location.launch_altitude)
-        ? impact_location.launch_altitude
-        : DEFAULT_LOCATION.launch_altitude;
-      const endLon = impact_location.longitude;
-      const endLat = impact_location.latitude;
-      const endAlt = impact_location.elevation;
-      // Calculate straight-line distance (meters)
+      const engagement = latestDefenseOutcome || {};
+      const approach = engagement.approachPoint || null;
+      const interceptTarget = (engagement && engagement.success && engagement.interceptPoint)
+        ? engagement.interceptPoint
+        : null;
+
+      const startLon = approach && isFiniteNumber(approach.longitude)
+        ? approach.longitude
+        : (isFiniteNumber(impact_location.launch_longitude)
+          ? impact_location.launch_longitude
+          : (impact_location.longitude - 5));
+      const startLat = approach && isFiniteNumber(approach.latitude)
+        ? approach.latitude
+        : (isFiniteNumber(impact_location.launch_latitude)
+          ? impact_location.launch_latitude
+          : (impact_location.latitude - 5));
+      const startAlt = approach && isFiniteNumber(approach.altitude)
+        ? approach.altitude
+        : (isFiniteNumber(impact_location.launch_altitude)
+          ? impact_location.launch_altitude
+          : DEFAULT_LOCATION.launch_altitude);
+
+      const endLon = interceptTarget && isFiniteNumber(interceptTarget.longitude)
+        ? interceptTarget.longitude
+        : impact_location.longitude;
+      const endLat = interceptTarget && isFiniteNumber(interceptTarget.latitude)
+        ? interceptTarget.latitude
+        : impact_location.latitude;
+      const endAlt = interceptTarget && isFiniteNumber(interceptTarget.altitude)
+        ? Math.max(interceptTarget.altitude, 1000)
+        : impact_location.elevation;
+
+      const targetCartesian = interceptTarget
+        ? Cesium.Cartesian3.fromDegrees(endLon, endLat, endAlt)
+        : impactCartesian;
+
       const horizontalDistance = Math.sqrt(Math.pow(endLon - startLon, 2) + Math.pow(endLat - startLat, 2)) * 111000;
       const verticalDistance = Math.abs(startAlt - endAlt);
       const totalDistance = Math.sqrt(Math.pow(horizontalDistance, 2) + Math.pow(verticalDistance, 2));
-      // Animation duration: time = distance / speed
       const durationSeconds = Math.max(1, totalDistance / Math.max(asteroid_properties.speed, 1));
       const now = new Date();
       const startTimeIso = new Date(now.getTime()).toISOString();
       const stopTimeIso = new Date(now.getTime() + durationSeconds * 1000).toISOString();
+      const midLon = (startLon + endLon) / 2;
+      const midLat = (startLat + endLat) / 2;
+      const midAlt = interceptTarget
+        ? Math.max(startAlt, endAlt) * 0.7
+        : startAlt / 2;
       const trajectory = [
         { lon: startLon, lat: startLat, alt: startAlt, time: startTimeIso },
-        { lon: (startLon + endLon) / 2, lat: (startLat + endLat) / 2, alt: startAlt / 2, time: new Date(now.getTime() + durationSeconds * 500).toISOString() },
+        { lon: midLon, lat: midLat, alt: midAlt, time: new Date(now.getTime() + durationSeconds * 500).toISOString() },
         { lon: endLon, lat: endLat, alt: endAlt, time: stopTimeIso }
       ];
       const property = new Cesium.SampledPositionProperty();
@@ -941,7 +1557,6 @@ function runCesium(containerId) {
       viewer.clock.stopTime = stop.clone();
       viewer.clock.currentTime = start.clone();
       viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
-      // Clock multiplier: higher speed = faster animation
       viewer.clock.multiplier = Math.max(1, asteroid_properties.speed / 500);
       viewer.timeline.zoomTo(start, stop);
       asteroidEntity = viewer.entities.add({
@@ -960,8 +1575,8 @@ function runCesium(containerId) {
       function onTick() {
         const asteroidPosition = asteroidEntity.position.getValue(viewer.clock.currentTime);
         if (asteroidPosition) {
-          const distance = Cesium.Cartesian3.distance(asteroidPosition, impactCartesian);
-          if (distance < Math.max(1000, asteroid_properties.size * 10)) {
+          const distance = Cesium.Cartesian3.distance(asteroidPosition, targetCartesian);
+          if (distance < Math.max(1500, asteroid_properties.size * 10)) {
             viewer.clock.shouldAnimate = false;
             viewer.clock.onTick.removeEventListener(onTick);
             viewer.trackedEntity = undefined;
@@ -969,26 +1584,43 @@ function runCesium(containerId) {
             asteroidEntity = null;
             cameraMode = 'impact';
             document.getElementById('cameraToggleButton').textContent = 'Follow Asteroid';
+            const flyDestination = interceptTarget
+              ? Cesium.Cartesian3.fromDegrees(
+                  endLon,
+                  endLat,
+                  Math.max(endAlt + 150000, 150000)
+                )
+              : Cesium.Cartesian3.fromDegrees(
+                  impact_location.longitude,
+                  impact_location.latitude,
+                  200000
+                );
+            const flyOrientation = interceptTarget
+              ? {
+                  heading: Cesium.Math.toRadians(0.0),
+                  pitch: Cesium.Math.toRadians(-35.0),
+                  roll: 0.0
+                }
+              : {
+                  heading: Cesium.Math.toRadians(0.0),
+                  pitch: Cesium.Math.toRadians(-90.0),
+                  roll: 0.0
+                };
             viewer.camera.flyTo({
-              destination: Cesium.Cartesian3.fromDegrees(
-                impact_location.longitude,
-                impact_location.latitude,
-                200000
-              ),
-              orientation: {
-                heading: Cesium.Math.toRadians(0.0),
-                pitch: Cesium.Math.toRadians(-90.0),
-                roll: 0.0
-              }
+              destination: flyDestination,
+              orientation: flyOrientation
             });
-            runImpactAnimation();
+            if (interceptTarget) {
+              runDefenseInterceptAnimation(engagement);
+            } else {
+              runImpactAnimation();
+            }
           }
         }
       }
       viewer.clock.onTick.addEventListener(onTick);
       viewer.clock.shouldAnimate = true;
     }
-
     // Impact animation sequence
     function runImpactAnimation() {
       cleanupAnimations();
@@ -1093,7 +1725,133 @@ function runCesium(containerId) {
       }, 1800);
     }
 
-    // Button event listeners
+    function runDefenseInterceptAnimation(outcome = null) {
+      cleanupAnimations();
+      document.getElementById('toggleButton').style.display = 'none';
+      state.visualizationEntities.forEach(entity => viewer.entities.remove(entity));
+      state.visualizationEntities.clear();
+
+      if (!outcome || !outcome.success || !outcome.interceptPoint) {
+        runImpactAnimation();
+        return;
+      }
+
+      const interceptLon = toNumber(outcome.interceptPoint.longitude, impact_location.longitude);
+      const interceptLat = toNumber(outcome.interceptPoint.latitude, impact_location.latitude);
+      const interceptAlt = Math.max(toNumber(outcome.interceptPoint.altitude, 0), 50000);
+      const interceptCartesian = Cesium.Cartesian3.fromDegrees(interceptLon, interceptLat, interceptAlt);
+      const successColor = Cesium.Color.LIME;
+
+      const flash = viewer.entities.add({
+        position: interceptCartesian,
+        ellipsoid: {
+          radii: new Cesium.Cartesian3(9000, 9000, 9000),
+          material: successColor.withAlpha(0.85)
+        }
+      });
+      state.visualizationEntities.add(flash);
+
+      const pulse = viewer.entities.add({
+        position: interceptCartesian,
+        ellipsoid: {
+          radii: new Cesium.Cartesian3(4000, 4000, 4000),
+          material: successColor.withAlpha(0.35)
+        }
+      });
+      state.visualizationEntities.add(pulse);
+      const pulseStart = performance.now();
+      function animatePulse(now) {
+        const elapsed = now - pulseStart;
+        const frac = Math.min(elapsed / 1600, 1);
+        const size = 4000 + frac * 95000;
+        pulse.ellipsoid.radii = new Cesium.Cartesian3(size, size, size * 0.32);
+        pulse.ellipsoid.material = successColor.withAlpha(0.35 * (1 - frac));
+        if (frac < 1) {
+          requestAnimationFrame(animatePulse);
+        } else {
+          viewer.entities.remove(pulse);
+          state.visualizationEntities.delete(pulse);
+        }
+      }
+      requestAnimationFrame(animatePulse);
+
+      if (outcome.deflectionPoint) {
+        const deflectionLon = toNumber(outcome.deflectionPoint.longitude, interceptLon + 4);
+        const deflectionLat = toNumber(outcome.deflectionPoint.latitude, interceptLat + 3);
+        const deflectionAlt = Math.max(toNumber(outcome.deflectionPoint.altitude, interceptAlt + 120000), 60000);
+        const deflectionCartesian = Cesium.Cartesian3.fromDegrees(deflectionLon, deflectionLat, deflectionAlt);
+        const deflectionTrail = viewer.entities.add({
+          polyline: {
+            positions: [interceptCartesian, deflectionCartesian],
+            width: 3.6,
+            material: new Cesium.PolylineGlowMaterialProperty({
+              glowPower: 0.3,
+              taperPower: 0.4,
+              color: successColor.withAlpha(0.85)
+            })
+          }
+        });
+        state.visualizationEntities.add(deflectionTrail);
+        const deflectedMarker = viewer.entities.add({
+          position: deflectionCartesian,
+          point: {
+            pixelSize: 9,
+            color: Cesium.Color.AQUA.withAlpha(0.95),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 1.4
+          },
+          label: {
+            text: 'Asteroid Diverted',
+            font: '13px "Roboto", sans-serif',
+            fillColor: Cesium.Color.AQUA,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 1,
+            pixelOffset: new Cesium.Cartesian2(0, -12),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          }
+        });
+        state.visualizationEntities.add(deflectedMarker);
+      }
+
+      const safeRadius = Math.max(toNumber(impact_result.evacuation_radius, 60000) * 0.55, 30000);
+      const safetyRing = viewer.entities.add({
+        position: impactCartesian,
+        ellipse: {
+          semiMajorAxis: safeRadius,
+          semiMinorAxis: safeRadius,
+          material: successColor.withAlpha(0.12),
+          outline: true,
+          outlineColor: successColor.withAlpha(0.45),
+          height: 0
+        },
+        description: 'Deflection shielded population center'
+      });
+      state.visualizationEntities.add(safetyRing);
+
+      const labelText = outcome?.summary
+        ? outcome.summary
+        : 'Trajectory Diverted — Region Safe';
+      const safetyLabel = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(
+          impact_location.longitude,
+          impact_location.latitude,
+          Math.max(impact_location.elevation + 1800, 1800)
+        ),
+        label: {
+          text: labelText,
+          font: '15px "Roboto", sans-serif',
+          fillColor: Cesium.Color.LIME,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        }
+      });
+      state.visualizationEntities.add(safetyLabel);
+
+      state.isShowingCrater = false;
+    }
+
     document.getElementById('toggleButton').addEventListener('click', () => {
       if (state.isShowingCrater) {
         state.craterEntities.forEach(entity => viewer.entities.remove(entity));
@@ -1128,7 +1886,7 @@ function runCesium(containerId) {
         });
       }
     });
-    function resetSimulation() {
+    function resetSimulation({ forceDefenseVisualization = false } = {}) {
       console.log("resetSimulation called");
       applySimulationState();
       cleanupAnimations();
@@ -1136,10 +1894,22 @@ function runCesium(containerId) {
       state.visualizationEntities.clear();
       state.craterEntities.clear();
       state.neoEntities.clear();
+      state.defenseEntities.clear();
       neoState.entities = [];
       state.isShowingCrater = false;
       document.getElementById('toggleButton').style.display = 'none';
       document.getElementById('toggleButton').textContent = 'Show Crater';
+
+      const shouldRenderDefense = (forceDefenseVisualization || defenseOverlayEnabled)
+        && latestDefensePlan
+        && Array.isArray(latestDefensePlan.loadout)
+        && latestDefensePlan.loadout.length > 0;
+
+      if (shouldRenderDefense) {
+        renderDefensePlan(latestDefensePlan, { flyTo: false });
+      } else {
+        clearDefenseEntities();
+      }
 
       if (neoState.visible && neoState.data.length) {
         renderNeoEntities();
@@ -1168,6 +1938,23 @@ function runCesium(containerId) {
         resetSimulation();
       } catch (simulationError) {
         console.error('Failed to restart Cesium simulation', simulationError);
+      }
+    };
+
+    window.replayDefenseVisualization = () => {
+      if (!latestDefensePlan || !Array.isArray(latestDefensePlan.loadout) || latestDefensePlan.loadout.length === 0) {
+        return;
+      }
+      try {
+        renderDefensePlan(latestDefensePlan, { flyTo: true });
+        cameraMode = 'asteroid';
+        const cameraToggleButton = document.getElementById('cameraToggleButton');
+        if (cameraToggleButton) {
+          cameraToggleButton.textContent = 'Focus Impact';
+        }
+        resetSimulation({ forceDefenseVisualization: !defenseOverlayEnabled });
+      } catch (error) {
+        console.error('Failed to replay defense visualization', error);
       }
     };
 
