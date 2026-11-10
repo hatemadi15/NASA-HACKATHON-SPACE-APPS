@@ -11,7 +11,10 @@ export function setupCesiumVisualization(containerId) {
 }
 
 async function runCesium(containerId) {
-  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2ODM4NDkyMC04ZDc1LTRkNmYtYjRlNi1hN2YyYTkzYzI1OWIiLCJpZCI6MzM4MzI2LCJpYXQiOjE3NTk1ODMyODN9.8Oh3jFNzuWbGuNUYmt6VewXvFwKuqQwrWoeCw1VfVi8';
+  // Set a deployment-specific token before this script loads.
+  if (window.CESIUM_ION_TOKEN) {
+    Cesium.Ion.defaultAccessToken = window.CESIUM_ION_TOKEN;
+  }
   const viewer = new Cesium.Viewer(containerId, {
     terrain: Cesium.Terrain.fromWorldTerrain(),
     baseLayerPicker: false,
