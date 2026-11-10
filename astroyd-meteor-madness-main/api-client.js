@@ -75,6 +75,13 @@ class MeteorMadnessAPI {
         return this._fetch(`${this.baseURL}/simulation/history`);
     }
 
+    async getPopulationDensity(latitude, longitude) {
+        const data = await this._fetch(
+            `${this.baseURL}/nasa/population-data?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
+        );
+        return data?.population_density ?? null;
+    }
+
     async simulateImpact(asteroidData, impactLocation, options = {}) {
         const requestData = {
             asteroid: {
@@ -99,6 +106,33 @@ class MeteorMadnessAPI {
         };
 
         return this._fetch(`${this.baseURL}/simulation/simulate`, {
+            method: 'POST',
+            body: JSON.stringify(requestData)
+        });
+    }
+
+    async calculateAdvancedImpact(asteroidData, impactLocation, options = {}) {
+        const requestData = {
+            asteroid: {
+                diameter: asteroidData.diameter || asteroidData.size,
+                mass: asteroidData.mass,
+                velocity: asteroidData.velocity || asteroidData.speed,
+                density: asteroidData.density,
+                impact_angle: asteroidData.impact_angle,
+                composition: asteroidData.composition || 'iron'
+            },
+            impact_location: {
+                latitude: impactLocation.latitude,
+                longitude: impactLocation.longitude,
+                elevation: impactLocation.elevation || 0,
+                terrain_type: impactLocation.terrain_type || 'land',
+                population_density: impactLocation.population_density ?? 0,
+                infrastructure_density: impactLocation.infrastructure_density ?? 0
+            },
+            use_nasa_population: options.useNasaPopulation ?? true
+        };
+
+        return this._fetch(`${this.baseURL}/simulation/advanced`, {
             method: 'POST',
             body: JSON.stringify(requestData)
         });

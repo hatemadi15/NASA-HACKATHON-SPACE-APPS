@@ -43,6 +43,63 @@ logger = logging.getLogger(__name__)
 # In-memory storage for demo (replace with database in production)
 _solutions_cache: List[SolutionMethod] = []
 
+class AdvancedMetricsRequest(BaseModel):
+    asteroid: Asteroid
+    impact_location: ImpactLocation
+    use_nasa_population: bool = True
+
+
+class AdvancedMetricsResponse(BaseModel):
+    asteroid: Asteroid
+    impact_location: ImpactLocation
+    impact_result: ImpactResult
+    damage_assessment: DamageAssessment
+    population_density: float
+
+
+@router.post("/advanced", response_model=AdvancedMetricsResponse)
+async def calculate_advanced_metrics(request: AdvancedMetricsRequest) -> AdvancedMetricsResponse:
+    """Calculate advanced damage metrics with refreshed population data."""
+    try:
+        location_payload = request.impact_location.model_dump()
+        resolved_density = float(location_payload.get("population_density", 0.0) or 0.0)
+
+        try:
+            population_data = await nasa_client.get_population_data(
+                location_payload["latitude"],
+                location_payload["longitude"]
+            )
+            fetched_density = population_data.get("population_density") if population_data else None
+            if fetched_density is not None:
+                resolved_density = float(fetched_density)
+        except Exception as exc:
+            logger.warning("Failed to refresh population density from NASA: %s", exc)
+
+        location_payload["population_density"] = resolved_density
+        location = ImpactLocation(**location_payload)
+
+        impact_result_data = impact_calculator.calculate_impact_result(request.asteroid, location)
+        impact_result = ImpactResult(
+            **{
+                **impact_result_data,
+                "impact_zones": impact_result_data.get("impact_zones", []) or []
+            }
+        )
+
+        damage_data = damage_assessor.assess_damage(request.asteroid, location, impact_result_data)
+        damage_assessment = DamageAssessment(**damage_data)
+
+        return AdvancedMetricsResponse(
+            asteroid=request.asteroid,
+            impact_location=location,
+            impact_result=impact_result,
+            damage_assessment=damage_assessment,
+            population_density=resolved_density
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Advanced metrics calculation failed: {str(exc)}")
+
+
 @router.post("/simulate", response_model=SimulationResponse)
 async def simulate_impact(
     request: SimulationRequest,
