@@ -12,33 +12,71 @@ class MeteorMadnessAPI {
     }
 
     async _fetch(url, options = {}) {
+        const {
+            headers: customHeaders = {},
+            timeoutMs = 20000,
+            ...fetchOptions
+        } = options;
+
         const headers = {
             'Content-Type': 'application/json',
-            ...options.headers,
+            ...customHeaders,
         };
 
         if (this.token) {
             headers['Authorization'] = `Bearer ${this.token}`;
         }
 
-        const response = await fetch(url, {
-            ...options,
-            headers,
-        });
+          const controller = new AbortController();
+        const timeoutId = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
-        if (!response.ok) {
-            console.log('Raw error response:', response);
-            const rawBody = await response.text();
-            console.log('Raw error body:', rawBody);
-            try {
-                const errorData = JSON.parse(rawBody);
-                throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-            } catch (e) {
-                throw new Error(rawBody || `HTTP error! status: ${response.status}`);
+        try {
+            const response = await fetch(url, {
+                ...fetchOptions,
+                headers,
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                console.log('Raw error response:', response);
+                const rawBody = await response.text();
+                console.log('Raw error body:', rawBody);
+                try {
+                    const errorData = rawBody ? JSON.parse(rawBody) : null;
+                    throw new Error(errorData?.detail || `HTTP error! status: ${response.status}`);
+                } catch (e) {
+                    if (rawBody) {
+                        throw new Error(rawBody);
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            }
+       const responseText = await response.text();
+            if (!responseText) {
+                return null;
+            }
+        
+
+        const contentType = response.headers.get('Content-Type') || '';
+            if (contentType.toLowerCase().includes('application/json')) {
+                try {
+                    return JSON.parse(responseText);
+                } catch (error) {
+                    throw new Error('Failed to parse JSON response');
+                }
+            }
+
+            return responseText;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error(`Request to ${url} timed out after ${timeoutMs} ms`);
+            }
+            throw error;
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
             }
         }
-
-        return await response.json();
     }
 
     async login(username, password) {
