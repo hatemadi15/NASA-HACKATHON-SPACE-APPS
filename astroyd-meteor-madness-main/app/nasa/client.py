@@ -233,6 +233,7 @@ class NASAClient:
 
 			params = {
 				"f": "json",
+				"where": "1=1",
 				"geometry": f"{lon},{lat}",
 				"geometryType": "esriGeometryPoint",
 				"inSR": 4326,
