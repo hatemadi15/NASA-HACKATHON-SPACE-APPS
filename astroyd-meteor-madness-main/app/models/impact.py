@@ -141,55 +141,133 @@ class Warning(BaseModel):
 	timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 class DamageAssessment(BaseModel):
-	"""Human and infrastructure damage assessment"""
-	# Human casualties
-	estimated_casualties: int = Field(..., ge=0, description="Estimated number of casualties")
-	injured_count: int = Field(..., ge=0, description="Estimated number of injured")
-	displaced_count: int = Field(..., ge=0, description="Estimated number of displaced people")
-	# Infrastructure damage
-	infrastructure_damage_cost: float = Field(..., ge=0, description="Infrastructure damage cost in USD")
-	buildings_destroyed: int = Field(..., ge=0, description="Number of buildings destroyed")
-	buildings_damaged: int = Field(..., ge=0, description="Number of buildings damaged")
-	# Environmental impact
-	environmental_impact_score: float = Field(..., ge=0, le=10, description="Environmental impact score (0-10)")
-	ecosystem_affected_area: float = Field(..., ge=0, description="Ecosystem affected area in km²")
-	# Economic impact
-	total_economic_cost: float = Field(..., ge=0, description="Total economic cost in USD")
-	recovery_time_years: float = Field(..., ge=0, description="Estimated recovery time in years")
+    """Human and infrastructure damage assessment"""
 
-	class Config:
-		json_encoders = {
-			float: lambda v: round(v, 2) if v is not None else None
-		}
+    # Human casualties
+    estimated_casualties: int = Field(..., ge=0, description="Estimated number of casualties")
+    injured_count: int = Field(..., ge=0, description="Estimated number of injured")
+    displaced_count: int = Field(..., ge=0, description="Estimated number of displaced people")
+    # Infrastructure damage
+    infrastructure_damage_cost: float = Field(..., ge=0, description="Infrastructure damage cost in USD")
+    buildings_destroyed: int = Field(..., ge=0, description="Number of buildings destroyed")
+    buildings_damaged: int = Field(..., ge=0, description="Number of buildings damaged")
+    # Environmental impact
+    environmental_impact_score: float = Field(..., ge=0, le=10, description="Environmental impact score (0-10)")
+    ecosystem_affected_area: float = Field(..., ge=0, description="Ecosystem affected area in km²")
+    # Economic impact
+    total_economic_cost: float = Field(..., ge=0, description="Total economic cost in USD")
+    recovery_time_years: float = Field(..., ge=0, description="Estimated recovery time in years")
+
+    class Config:
+        json_encoders = {
+            float: lambda v: round(v, 2) if v is not None else None
+        }
+
 
 class SimulationRequest(BaseModel):
-	"""Complete simulation request"""
-	asteroid: Asteroid
-	impact_location: ImpactLocation
-	use_nasa_data: bool = Field(False, description="If true, enrich location using NASA/USGS data")
-	use_ml: bool = Field(False, description="If true, use ML enhancer on damage predictions")
-	simulation_id: Optional[str] = Field(None, description="Optional simulation ID")
-	# Mitigation / deflection parameters
-	dv_mps: float = Field(0.0, ge=0.0, description="Mitigation delta-v to reduce impact velocity (m/s)")
-	deflection_method: Optional[str] = Field(None, description="Mitigation method label")
-	calculate_trajectory: bool = Field(True, description="Calculate full trajectory")
-	include_zones: bool = Field(True, description="Calculate environmental zones")
+    """Complete simulation request"""
+
+    asteroid: Asteroid
+    impact_location: ImpactLocation
+    use_nasa_data: bool = Field(False, description="If true, enrich location using NASA/USGS data")
+    use_ml: bool = Field(False, description="If true, use ML enhancer on damage predictions")
+    simulation_id: Optional[str] = Field(None, description="Optional simulation ID")
+    # Mitigation / deflection parameters
+    dv_mps: float = Field(0.0, ge=0.0, description="Mitigation delta-v to reduce impact velocity (m/s)")
+    deflection_method: Optional[str] = Field(None, description="Mitigation method label")
+    calculate_trajectory: bool = Field(True, description="Calculate full trajectory")
+    include_zones: bool = Field(True, description="Calculate environmental zones")
+
 
 class SimulationResponse(BaseModel):
-	"""Complete simulation response"""
-	simulation_id: str
-	asteroid: Asteroid
-	impact_location: ImpactLocation
-	impact_result: ImpactResult
-	damage_assessment: DamageAssessment
-	mitigation_result: Optional[MitigationResult] = Field(None, description="Mitigation results if applied")
-	trajectory: Optional[List[TrajectoryPoint]] = Field(None, description="Asteroid trajectory")
-	warnings: List[Warning] = Field(default_factory=list, description="System warnings")
-	simulation_metadata: Dict[str, Any] = Field(default_factory=dict)
-	# Convenience exposure for UI overlays
-	population_density: float | None = Field(None, description="Population density per km² at impact location")
-	elevation: float | None = Field(None, description="Elevation (m) at impact location")
-	terrain_type: str | None = Field(None, description="Terrain type at impact location")
+    """Complete simulation response"""
+
+    simulation_id: str
+    asteroid: Asteroid
+    impact_location: ImpactLocation
+    impact_result: ImpactResult
+    damage_assessment: DamageAssessment
+    mitigation_result: Optional[MitigationResult] = Field(None, description="Mitigation results if applied")
+    trajectory: Optional[List[TrajectoryPoint]] = Field(None, description="Asteroid trajectory")
+    warnings: List[Warning] = Field(default_factory=list, description="System warnings")
+    simulation_metadata: Dict[str, Any] = Field(default_factory=dict)
+    # Convenience exposure for UI overlays
+    population_density: float | None = Field(None, description="Population density per km² at impact location")
+    elevation: float | None = Field(None, description="Elevation (m) at impact location")
+    terrain_type: str | None = Field(None, description="Terrain type at impact location")
+
+
+class AdvancedImpactCalculationOptions(BaseModel):
+    """Optional calculations for advanced impact analysis"""
+
+    calculate_human_casualties: bool = Field(True, description="Include human casualty estimates")
+    calculate_infrastructure_damage: bool = Field(True, description="Include infrastructure damage estimates")
+    calculate_environmental_impact: bool = Field(True, description="Include environmental impact estimates")
+    calculate_economic_impact: bool = Field(True, description="Include economic impact estimates")
+    calculate_damage_assessment: bool = Field(True, description="Include combined damage assessment summary")
+    calculate_kinetic_energy: bool = Field(True, description="Calculate kinetic energy release")
+    calculate_atmospheric_entry: bool = Field(True, description="Calculate atmospheric entry effects")
+    calculate_crater_formation: bool = Field(True, description="Calculate crater formation metrics")
+    calculate_blast_effects: bool = Field(True, description="Calculate blast and thermal effects")
+    calculate_tsunami_effects: bool = Field(True, description="Calculate tsunami impacts where applicable")
+    recalculate_evacuation_radius: bool = Field(True, description="Recalculate evacuation radius")
+    calculate_impact_result: bool = Field(True, description="Recalculate complete impact result")
+    use_ml_enhancer: bool = Field(False, description="Apply ML enhancer to damage assessment")
+
+
+class AdvancedImpactCalculationRequest(BaseModel):
+    """Request payload for advanced impact calculations"""
+
+    asteroid: Asteroid
+    impact_location: ImpactLocation
+    options: AdvancedImpactCalculationOptions = Field(
+        default_factory=AdvancedImpactCalculationOptions,
+        description="Calculation options"
+    )
+
+
+class AdvancedImpactCalculationResponse(BaseModel):
+    """Response payload for advanced impact calculations"""
+
+    kinetic_energy: Optional[Dict[str, float]] = Field(
+        None, description="Kinetic energy release in Joules and megatons"
+    )
+    atmospheric_entry: Optional[Dict[str, float]] = Field(
+        None, description="Atmospheric entry characteristics"
+    )
+    crater_formation: Optional[Dict[str, float]] = Field(
+        None, description="Crater formation metrics"
+    )
+    blast_effects: Optional[Dict[str, float]] = Field(
+        None, description="Blast and thermal effects"
+    )
+    tsunami_effects: Optional[Dict[str, float]] = Field(
+        None, description="Tsunami metrics for ocean impacts"
+    )
+    evacuation_radius: Optional[float] = Field(
+        None, description="Recommended evacuation radius in meters"
+    )
+    impact_result: Optional[Dict[str, Any]] = Field(
+        None, description="Complete impact result"
+    )
+    human_casualties: Optional[Dict[str, int]] = Field(
+        None, description="Human casualty estimates"
+    )
+    infrastructure_damage: Optional[Dict[str, Any]] = Field(
+        None, description="Infrastructure damage metrics"
+    )
+    environmental_impact: Optional[Dict[str, Any]] = Field(
+        None, description="Environmental impact metrics"
+    )
+    economic_impact: Optional[Dict[str, float]] = Field(
+        None, description="Economic impact estimates"
+    )
+    damage_assessment: Optional[Dict[str, Any]] = Field(
+        None, description="Combined damage assessment summary"
+    )
+    ml_enhanced_damage: Optional[Dict[str, Any]] = Field(
+        None, description="Damage assessment adjusted by ML enhancer"
+    )
 
 class DeflectionGameScoreResponse(BaseModel):
 	"""Deflection game score response"""

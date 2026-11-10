@@ -14,8 +14,8 @@ import dataclasses
 
 from app.models.asteroid import Asteroid, AsteroidCreate, AsteroidResponse
 from app.models.impact import (
-    ImpactLocation, 
-    SimulationRequest, 
+    ImpactLocation,
+    SimulationRequest,
     SimulationResponse,
     ImpactResult,
     DamageAssessment,
@@ -25,7 +25,9 @@ from app.models.impact import (
     Warning,
     DeflectionGameScore,
     DeflectionGameScoreResponse,
-    SolutionMethod
+    SolutionMethod,
+    AdvancedImpactCalculationRequest,
+    AdvancedImpactCalculationResponse
 )
 from app.physics.impact_calculator import impact_calculator
 from app.physics.damage_assessor import damage_assessor
@@ -222,6 +224,147 @@ async def simulate_impact(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Simulation failed: {str(e)}")
+
+
+@router.post("/calculate/advanced", response_model=AdvancedImpactCalculationResponse)
+async def calculate_advanced_metrics(request: AdvancedImpactCalculationRequest) -> AdvancedImpactCalculationResponse:
+    """Run advanced physics and damage calculations for UI controls."""
+
+    asteroid = request.asteroid
+    location = request.impact_location
+    options = request.options
+
+    response_payload: Dict[str, Any] = {}
+
+    # Physics calculations
+    crater_data: Optional[Dict[str, float]] = None
+    blast_data: Optional[Dict[str, float]] = None
+    impact_result_data: Optional[Dict[str, Any]] = None
+
+    if options.calculate_kinetic_energy:
+        kinetic_energy = impact_calculator.calculate_kinetic_energy(asteroid)
+        response_payload["kinetic_energy"] = {
+            "joules": float(kinetic_energy),
+            "megatons_tnt": float(kinetic_energy / 4.184e15)
+        }
+
+    if options.calculate_atmospheric_entry:
+        response_payload["atmospheric_entry"] = {
+            key: float(value)
+            for key, value in impact_calculator.calculate_atmospheric_entry_effects(asteroid).items()
+        }
+
+    if options.calculate_crater_formation or options.calculate_blast_effects or options.calculate_tsunami_effects:
+        crater_data = impact_calculator.calculate_crater_formation(asteroid, location)
+        if options.calculate_crater_formation:
+            response_payload["crater_formation"] = {
+                key: float(value) for key, value in crater_data.items()
+            }
+
+    if options.calculate_blast_effects or options.recalculate_evacuation_radius:
+        if crater_data is None:
+            crater_data = impact_calculator.calculate_crater_formation(asteroid, location)
+        blast_data = impact_calculator.calculate_blast_effects(asteroid, crater_data["crater_diameter"])
+        if options.calculate_blast_effects:
+            response_payload["blast_effects"] = {
+                key: float(value) for key, value in blast_data.items()
+            }
+
+    if options.calculate_tsunami_effects:
+        if crater_data is None:
+            crater_data = impact_calculator.calculate_crater_formation(asteroid, location)
+        tsunami_data = impact_calculator.calculate_tsunami_effects(asteroid, location, crater_data["crater_diameter"])
+        response_payload["tsunami_effects"] = {
+            key: float(value) for key, value in tsunami_data.items()
+        }
+
+    if options.recalculate_evacuation_radius:
+        if blast_data is None:
+            if crater_data is None:
+                crater_data = impact_calculator.calculate_crater_formation(asteroid, location)
+            blast_data = impact_calculator.calculate_blast_effects(asteroid, crater_data["crater_diameter"])
+        evacuation_radius = impact_calculator.calculate_evacuation_radius(
+            blast_data["blast_radius"],
+            blast_data["thermal_radius"],
+            blast_data["seismic_magnitude"]
+        )
+        response_payload["evacuation_radius"] = float(evacuation_radius)
+
+    needs_impact_result = any([
+        options.calculate_impact_result,
+        options.calculate_human_casualties,
+        options.calculate_infrastructure_damage,
+        options.calculate_environmental_impact,
+        options.calculate_economic_impact,
+        options.calculate_damage_assessment,
+        options.use_ml_enhancer
+    ])
+
+    if needs_impact_result:
+        impact_result_data = impact_calculator.calculate_impact_result(asteroid, location)
+        if options.calculate_impact_result:
+            response_payload["impact_result"] = {
+                key: (float(value) if isinstance(value, (int, float)) else value)
+                for key, value in impact_result_data.items()
+            }
+
+    damage_summary: Optional[Dict[str, Any]] = None
+    if any([
+        options.calculate_human_casualties,
+        options.calculate_infrastructure_damage,
+        options.calculate_environmental_impact,
+        options.calculate_economic_impact,
+        options.calculate_damage_assessment,
+        options.use_ml_enhancer
+    ]):
+        if impact_result_data is None:
+            impact_result_data = impact_calculator.calculate_impact_result(asteroid, location)
+        damage_summary = damage_assessor.assess_damage(asteroid, location, impact_result_data)
+
+        if options.calculate_human_casualties:
+            response_payload["human_casualties"] = {
+                key: int(damage_summary.get(key, 0))
+                for key in ("estimated_casualties", "injured_count", "displaced_count")
+            }
+
+        if options.calculate_infrastructure_damage:
+            response_payload["infrastructure_damage"] = {
+                key: damage_summary.get(key)
+                for key in ("infrastructure_damage_cost", "buildings_destroyed", "buildings_damaged")
+            }
+
+        if options.calculate_environmental_impact:
+            response_payload["environmental_impact"] = {
+                key: damage_summary.get(key)
+                for key in ("environmental_impact_score", "ecosystem_affected_area", "atmospheric_effects")
+            }
+
+        if options.calculate_economic_impact:
+            response_payload["economic_impact"] = {
+                key: damage_summary.get(key)
+                for key in (
+                    "total_economic_cost",
+                    "recovery_time_years",
+                    "casualty_cost",
+                    "injury_cost",
+                    "displacement_cost",
+                    "infrastructure_cost",
+                    "environmental_cost"
+                )
+            }
+
+        if options.calculate_damage_assessment:
+            response_payload["damage_assessment"] = damage_summary
+
+        if options.use_ml_enhancer:
+            features = {
+                "energy_megatons": asteroid.kinetic_energy_megatons,
+                "terrain_type": location.terrain_type,
+                "population_density": location.population_density,
+            }
+            response_payload["ml_enhanced_damage"] = ml_enhancer.enhance(features, damage_summary)
+
+    return AdvancedImpactCalculationResponse(**response_payload)
 
 async def _calculate_impact_zones(asteroid, location, impact_data) -> List[ImpactZone]:
     """Calculate environmental impact zones"""

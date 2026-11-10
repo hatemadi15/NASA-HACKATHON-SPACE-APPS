@@ -172,6 +172,84 @@
     #historyTable th {
         background-color: #f2f2f2;
     }
+
+    #impactForm {
+      font-size: 13px;
+    }
+
+    .settings-tabs {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0 16px;
+    }
+
+    .settings-tab {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      background: rgba(42, 42, 42, 0.12);
+      color: #2a2a2a;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .settings-tab:hover:not(.active) {
+      background: rgba(42, 42, 42, 0.18);
+    }
+
+    .settings-tab.active {
+      background: rgba(42, 42, 42, 0.85);
+      color: #ffffff;
+    }
+
+    .settings-tab:focus-visible {
+      outline: 2px solid rgba(42, 42, 42, 0.85);
+      outline-offset: 2px;
+    }
+
+    .settings-page {
+      display: none;
+    }
+
+    .settings-page.active {
+      display: block;
+    }
+
+    .field-group {
+      margin-bottom: 14px;
+    }
+
+    .field-group h4 {
+      margin: 0 0 8px;
+      font-size: 13px;
+    }
+
+    .advanced-checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .advanced-checkbox-grid label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .advanced-results {
+      margin-top: 12px;
+      font-size: 12px;
+      display: none;
+      background: rgba(0, 0, 0, 0.03);
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -237,57 +315,113 @@
     </div>
     <form id="impactForm">
       <h3 style="margin-top:0">Asteroid Impact Settings</h3>
-      <label for="asteroid-focus">Focus on:</label>
-      <select id="asteroid-focus" name="asteroid-focus" style="width:150px;margin-bottom:8px">
-        <option value="earth">Earth</option>
-      </select><br>
+      <div class="settings-tabs" role="tablist" aria-label="Impact settings sections">
+        <button type="button" class="settings-tab active" data-page="basic" role="tab" aria-selected="true" aria-controls="settings-page-basic">Core Inputs</button>
+        <button type="button" class="settings-tab" data-page="advanced" role="tab" aria-selected="false" aria-controls="settings-page-advanced">Advanced Analysis</button>
+      </div>
 
-      <label for="latitude">Latitude:</label>
-      <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
-      <label for="longitude">Longitude:</label>
-      <input type="number" id="longitude" name="longitude" step="0.01" value="35.5018" style="width:80px;margin-bottom:8px"><br>
-      <label for="elevation">Elevation (m):</label>
-      <input type="number" id="elevation" name="elevation" step="1" value="0" style="width:80px;margin-bottom:8px"><br>
-      <label for="terrain_type">Terrain Type:</label>
-      <select id="terrain_type" name="terrain_type" style="width:90px;margin-bottom:8px">
-        <option value="ocean">Ocean</option>
-        <option value="land" selected>Land</option>
-        <option value="urban">Urban</option>
-        <option value="rural">Rural</option>
-        <option value="mountain">Mountain</option>
-        <option value="desert">Desert</option>
-        <option value="forest">Forest</option>
-        <option value="ice">Ice</option>
-      </select><br>
-      <hr style="margin:12px 0">
-      <label for="asteroid_size">Asteroid Size (m):</label>
-      <input type="number" id="asteroid_size" name="asteroid_size" step="1" value="50" style="width:80px;margin-bottom:8px"><br>
-      <label for="asteroid_speed">Asteroid Speed (m/s):</label>
-      <input type="number" id="asteroid_speed" name="asteroid_speed" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
-      <label for="asteroid_mass">Asteroid Mass (kg):</label>
-      <input type="number" id="asteroid_mass" name="asteroid_mass" step="1" value="1000000" style="width:80px;margin-bottom:8px"><br>
-      <label for="asteroid_density">Asteroid Density (kg/m³):</label>
-      <input type="number" id="asteroid_density" name="asteroid_density" step="1" value="3000" style="width:80px;margin-bottom:8px"><br>
-      <label for="impact_angle">Impact Angle:</label>
-      <input type="number" id="impact_angle" name="impact_angle" step="1" value="45" style="width:80px;margin-bottom:8px"><br>
-      <label for="composition">Composition:</label>
-      <select id="composition" name="composition" style="width:90px;margin-bottom:8px">
-        <option value="iron">Iron</option>
-        <option value="stony" selected>Stony</option>
-        <option value="carbonaceous">Carbonaceous</option>
-        <option value="mixed">Mixed</option>
-      </select><br>
-      <hr style="margin:12px 0">
-      <label for="crater_diameter">Crater Diameter (m):</label>
-      <input type="number" id="crater_diameter" name="crater_diameter" step="1" value="1200" style="width:80px;margin-bottom:8px"><br>
-      <label for="blast_radius">Blast Radius (m):</label>
-      <input type="number" id="blast_radius" name="blast_radius" step="1" value="50000" style="width:80px;margin-bottom:8px"><br>
-      <label for="thermal_radius">Thermal Radius (m):</label>
-      <input type="number" id="thermal_radius" name="thermal_radius" step="1" value="80000" style="width:80px;margin-bottom:8px"><br>
-      <label for="fireball_radius">Fireball Radius (m):</label>
-      <input type="number" id="fireball_radius" name="fireball_radius" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
-      <label for="evacuation_radius">Evacuation Radius (m):</label>
-      <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px"><br>
+      <div class="settings-page active" id="settings-page-basic" data-page="basic" role="tabpanel" aria-label="Core Inputs" aria-hidden="false">
+        <div class="field-group">
+          <h4>Impact Location</h4>
+          <label for="asteroid-focus">Focus on:</label>
+          <select id="asteroid-focus" name="asteroid-focus" style="width:150px;margin-bottom:8px">
+            <option value="earth">Earth</option>
+          </select><br>
+
+          <label for="latitude">Latitude:</label>
+          <input type="number" id="latitude" name="latitude" step="0.01" value="33.8938" style="width:80px;margin-bottom:8px"><br>
+          <label for="longitude">Longitude:</label>
+          <input type="number" id="longitude" name="longitude" step="0.01" value="35.5018" style="width:80px;margin-bottom:8px"><br>
+          <label for="elevation">Elevation (m):</label>
+          <input type="number" id="elevation" name="elevation" step="1" value="0" style="width:80px;margin-bottom:8px"><br>
+          <label for="terrain_type">Terrain Type:</label>
+          <select id="terrain_type" name="terrain_type" style="width:90px;margin-bottom:8px">
+            <option value="ocean">Ocean</option>
+            <option value="land" selected>Land</option>
+            <option value="urban">Urban</option>
+            <option value="rural">Rural</option>
+            <option value="mountain">Mountain</option>
+            <option value="desert">Desert</option>
+            <option value="forest">Forest</option>
+            <option value="ice">Ice</option>
+          </select><br>
+          <label for="population_density">Population Density (per km²):</label>
+          <input type="number" id="population_density" name="population_density" step="1" value="1000" style="width:90px;margin-bottom:8px"><br>
+          <label for="infrastructure_density">Infrastructure Density (0-1):</label>
+          <input type="number" id="infrastructure_density" name="infrastructure_density" step="0.05" min="0" max="1" value="0.6" style="width:90px;margin-bottom:8px"><br>
+          <label for="water_depth">Water Depth (m):</label>
+          <input type="number" id="water_depth" name="water_depth" step="1" value="1000" style="width:90px;margin-bottom:8px">
+        </div>
+
+        <div class="field-group">
+          <h4>Asteroid Profile</h4>
+          <label for="asteroid_size">Asteroid Size (m):</label>
+          <input type="number" id="asteroid_size" name="asteroid_size" step="1" value="50" style="width:80px;margin-bottom:8px"><br>
+          <label for="asteroid_speed">Asteroid Speed (m/s):</label>
+          <input type="number" id="asteroid_speed" name="asteroid_speed" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+          <label for="asteroid_mass">Asteroid Mass (kg):</label>
+          <input type="number" id="asteroid_mass" name="asteroid_mass" step="1" value="1000000" style="width:80px;margin-bottom:8px"><br>
+          <label for="asteroid_density">Asteroid Density (kg/m³):</label>
+          <input type="number" id="asteroid_density" name="asteroid_density" step="1" value="3000" style="width:80px;margin-bottom:8px"><br>
+          <label for="impact_angle">Impact Angle:</label>
+          <input type="number" id="impact_angle" name="impact_angle" step="1" value="45" style="width:80px;margin-bottom:8px"><br>
+          <label for="composition">Composition:</label>
+          <select id="composition" name="composition" style="width:90px;margin-bottom:8px">
+            <option value="iron">Iron</option>
+            <option value="stony" selected>Stony</option>
+            <option value="carbonaceous">Carbonaceous</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <h4>Impact Footprint Overrides</h4>
+          <label for="crater_diameter">Crater Diameter (m):</label>
+          <input type="number" id="crater_diameter" name="crater_diameter" step="1" value="1200" style="width:80px;margin-bottom:8px"><br>
+          <label for="blast_radius">Blast Radius (m):</label>
+          <input type="number" id="blast_radius" name="blast_radius" step="1" value="50000" style="width:80px;margin-bottom:8px"><br>
+          <label for="thermal_radius">Thermal Radius (m):</label>
+          <input type="number" id="thermal_radius" name="thermal_radius" step="1" value="80000" style="width:80px;margin-bottom:8px"><br>
+          <label for="fireball_radius">Fireball Radius (m):</label>
+          <input type="number" id="fireball_radius" name="fireball_radius" step="1" value="20000" style="width:80px;margin-bottom:8px"><br>
+          <label for="evacuation_radius">Evacuation Radius (m):</label>
+          <input type="number" id="evacuation_radius" name="evacuation_radius" step="1" value="100000" style="width:80px;margin-bottom:8px">
+        </div>
+      </div>
+
+      <div class="settings-page" id="settings-page-advanced" data-page="advanced" role="tabpanel" aria-label="Advanced Analysis" aria-hidden="true">
+        <div class="field-group">
+          <p style="margin:0 0 10px;line-height:1.4;">Tune advanced analysis options and request in-depth calculations for the current scenario.</p>
+        </div>
+
+        <div class="field-group">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;">
+            <input type="checkbox" id="use_ml_enhancer" checked>
+            <span>Use ML Enhancer</span>
+          </label>
+        </div>
+
+        <div class="field-group">
+          <h4>Advanced Calculations</h4>
+          <div class="advanced-checkbox-grid">
+            <label><input type="checkbox" id="calc_human_casualties" checked> Human Casualties</label>
+            <label><input type="checkbox" id="calc_infrastructure_damage" checked> Infrastructure Damage</label>
+            <label><input type="checkbox" id="calc_environmental_impact" checked> Environmental Impact</label>
+            <label><input type="checkbox" id="calc_economic_impact" checked> Economic Impact</label>
+            <label><input type="checkbox" id="calc_damage_assessment" checked> Damage Summary</label>
+            <label><input type="checkbox" id="calc_kinetic_energy" checked> Kinetic Energy</label>
+            <label><input type="checkbox" id="calc_atmospheric_entry" checked> Atmospheric Entry</label>
+            <label><input type="checkbox" id="calc_crater_formation" checked> Crater Formation</label>
+            <label><input type="checkbox" id="calc_blast_effects" checked> Blast Effects</label>
+            <label><input type="checkbox" id="calc_tsunami_effects" checked> Tsunami Effects</label>
+            <label><input type="checkbox" id="calc_evacuation_radius" checked> Evacuation Radius</label>
+            <label><input type="checkbox" id="calc_impact_result" checked> Impact Result</label>
+          </div>
+        </div>
+
+        <button type="button" id="advancedCalcButton" style="margin-top:4px;width:100%;padding:8px;background:#2a2a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;">Calculate Advanced Metrics</button>
+        <div id="advancedResults" class="advanced-results"></div>
+      </div>
     </form>
   </div>
   <div id="neoListContainer" style="position:absolute;top:60px;right:10px;width:320px;max-height:400px;overflow-y:auto;background:rgba(255,255,255,0.95);padding:10px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.12);display:none;">
@@ -316,7 +450,9 @@
         longitude: 35.5018,
         elevation: 0.0,
         terrain_type: 'land',
-        population_density: 0,
+        population_density: 1000,
+        infrastructure_density: 0.6,
+        water_depth: 1000,
         blast_radius: 50000,
         crater_diameter: 1200,
         thermal_radius: 80000,
@@ -356,6 +492,260 @@
 
     const api = new MeteorMadnessAPI();
     let cachedHistory = [];
+
+    const numberFromInput = (id, fallback = 0) => {
+      const el = document.getElementById(id);
+      if (!el) {
+        return fallback;
+      }
+      const value = parseFloat(el.value);
+      return Number.isFinite(value) ? value : fallback;
+    };
+
+    const numberOrNullFromInput = (id) => {
+      const el = document.getElementById(id);
+      if (!el) {
+        return null;
+      }
+      const value = parseFloat(el.value);
+      return Number.isFinite(value) ? value : null;
+    };
+
+    const getAsteroidFormData = () => ({
+      diameter: numberFromInput('asteroid_size', DEFAULT_SIMULATION.asteroid.diameter),
+      mass: numberFromInput('asteroid_mass', DEFAULT_SIMULATION.asteroid.mass),
+      velocity: numberFromInput('asteroid_speed', DEFAULT_SIMULATION.asteroid.velocity),
+      density: numberFromInput('asteroid_density', DEFAULT_SIMULATION.asteroid.density),
+      impact_angle: numberFromInput('impact_angle', DEFAULT_SIMULATION.asteroid.impact_angle),
+      composition: document.getElementById('composition').value
+    });
+
+    const getImpactLocationFormData = () => ({
+      latitude: numberFromInput('latitude', DEFAULT_SIMULATION.location.latitude),
+      longitude: numberFromInput('longitude', DEFAULT_SIMULATION.location.longitude),
+      elevation: numberFromInput('elevation', DEFAULT_SIMULATION.location.elevation),
+      terrain_type: document.getElementById('terrain_type').value,
+      population_density: numberFromInput('population_density', DEFAULT_SIMULATION.location.population_density),
+      infrastructure_density: numberFromInput('infrastructure_density', DEFAULT_SIMULATION.location.infrastructure_density),
+      water_depth: numberOrNullFromInput('water_depth')
+    });
+
+    const getAdvancedCalculationOptions = () => ({
+      calculateHumanCasualties: document.getElementById('calc_human_casualties').checked,
+      calculateInfrastructureDamage: document.getElementById('calc_infrastructure_damage').checked,
+      calculateEnvironmentalImpact: document.getElementById('calc_environmental_impact').checked,
+      calculateEconomicImpact: document.getElementById('calc_economic_impact').checked,
+      calculateDamageAssessment: document.getElementById('calc_damage_assessment').checked,
+      calculateKineticEnergy: document.getElementById('calc_kinetic_energy').checked,
+      calculateAtmosphericEntry: document.getElementById('calc_atmospheric_entry').checked,
+      calculateCraterFormation: document.getElementById('calc_crater_formation').checked,
+      calculateBlastEffects: document.getElementById('calc_blast_effects').checked,
+      calculateTsunamiEffects: document.getElementById('calc_tsunami_effects').checked,
+      recalculateEvacuationRadius: document.getElementById('calc_evacuation_radius').checked,
+      calculateImpactResult: document.getElementById('calc_impact_result').checked,
+      useMlEnhancer: document.getElementById('use_ml_enhancer').checked
+    });
+
+    const advancedResultsContainer = document.getElementById('advancedResults');
+    const settingsPageButtons = Array.from(document.querySelectorAll('.settings-tab'));
+    const settingsPages = Array.from(document.querySelectorAll('.settings-page'));
+    let currentSettingsPage = 'basic';
+
+    const showSettingsPage = (page) => {
+      if (!page) {
+        return;
+      }
+
+      currentSettingsPage = page;
+
+      settingsPages.forEach((pageEl) => {
+        const isActive = pageEl.dataset.page === page;
+        pageEl.classList.toggle('active', isActive);
+        pageEl.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+      });
+
+      settingsPageButtons.forEach((button) => {
+        const isActive = button.dataset.page === page;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        button.setAttribute('tabindex', isActive ? '0' : '-1');
+      });
+    };
+
+    if (settingsPageButtons.length && settingsPages.length) {
+      settingsPageButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          showSettingsPage(button.dataset.page);
+        });
+      });
+
+      showSettingsPage(currentSettingsPage);
+    }
+
+    const formatNumber = (value, options = {}) => {
+      if (!Number.isFinite(value)) {
+        return 'N/A';
+      }
+      const { minimumFractionDigits = 0, maximumFractionDigits = 2 } = options;
+      return value.toLocaleString(undefined, {
+        minimumFractionDigits,
+        maximumFractionDigits
+      });
+    };
+
+    const toTitleCase = (text) => text.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+    const renderList = (title, items) => {
+      if (!items.length) {
+        return '';
+      }
+      return `
+        <div style="margin-bottom:10px;">
+          <h5 style="margin:0 0 6px 0;font-size:13px;">${title}</h5>
+          <ul style="margin:0;padding-left:18px;line-height:1.4;">
+            ${items.join('')}
+          </ul>
+        </div>
+      `;
+    };
+
+    const renderAdvancedResults = (results) => {
+      if (!advancedResultsContainer) {
+        return;
+      }
+
+      if (!results || Object.keys(results).length === 0) {
+        advancedResultsContainer.innerHTML = '<p style="margin:0;">No advanced results calculated.</p>';
+        advancedResultsContainer.style.display = 'block';
+        return;
+      }
+
+      const sections = [];
+
+      if (results.kinetic_energy) {
+        const energy = results.kinetic_energy;
+        const items = [
+          `<li><strong>Joules:</strong> ${formatNumber(energy.joules)}</li>`,
+          `<li><strong>Megatons TNT:</strong> ${formatNumber(energy.megatons_tnt)}</li>`
+        ];
+        sections.push(renderList('Kinetic Energy Released', items));
+      }
+
+      if (results.atmospheric_entry) {
+        const items = Object.entries(results.atmospheric_entry).map(([key, value]) => (
+          `<li><strong>${toTitleCase(key)}:</strong> ${formatNumber(value)}</li>`
+        ));
+        sections.push(renderList('Atmospheric Entry', items));
+      }
+
+      if (results.crater_formation) {
+        const items = Object.entries(results.crater_formation).map(([key, value]) => (
+          `<li><strong>${toTitleCase(key)}:</strong> ${formatNumber(value)}</li>`
+        ));
+        sections.push(renderList('Crater Formation', items));
+      }
+
+      if (results.blast_effects) {
+        const items = Object.entries(results.blast_effects).map(([key, value]) => (
+          `<li><strong>${toTitleCase(key)}:</strong> ${formatNumber(value)}</li>`
+        ));
+        sections.push(renderList('Blast Effects', items));
+      }
+
+      if (results.tsunami_effects) {
+        const items = Object.entries(results.tsunami_effects).map(([key, value]) => (
+          `<li><strong>${toTitleCase(key)}:</strong> ${formatNumber(value)}</li>`
+        ));
+        sections.push(renderList('Tsunami Effects', items));
+      }
+
+      if (Number.isFinite(results.evacuation_radius)) {
+        sections.push(renderList('Evacuation Guidance', [
+          `<li><strong>Recommended Radius:</strong> ${formatNumber(results.evacuation_radius)} m</li>`
+        ]));
+      }
+
+      if (results.impact_result) {
+        const impact = results.impact_result;
+        const impactItems = Object.entries(impact)
+          .filter(([key]) => key !== 'atmospheric_effects')
+          .map(([key, value]) => {
+            if (typeof value === 'number') {
+              return `<li><strong>${toTitleCase(key)}:</strong> ${formatNumber(value)}</li>`;
+            }
+            return `<li><strong>${toTitleCase(key)}:</strong> ${JSON.stringify(value)}</li>`;
+          });
+        if (impact.atmospheric_effects) {
+          impactItems.push(`<li><strong>Atmospheric Effects:</strong> ${JSON.stringify(impact.atmospheric_effects)}</li>`);
+        }
+        sections.push(renderList('Impact Result', impactItems));
+      }
+
+      if (results.human_casualties) {
+        const human = results.human_casualties;
+        const items = [
+          `<li><strong>Estimated Casualties:</strong> ${formatNumber(human.estimated_casualties)}</li>`,
+          `<li><strong>Injured:</strong> ${formatNumber(human.injured_count)}</li>`,
+          `<li><strong>Displaced:</strong> ${formatNumber(human.displaced_count)}</li>`
+        ];
+        sections.push(renderList('Human Casualties', items));
+      }
+
+      if (results.infrastructure_damage) {
+        const infra = results.infrastructure_damage;
+        const items = [
+          `<li><strong>Damage Cost:</strong> $${formatNumber(infra.infrastructure_damage_cost)}</li>`,
+          `<li><strong>Buildings Destroyed:</strong> ${formatNumber(infra.buildings_destroyed)}</li>`,
+          `<li><strong>Buildings Damaged:</strong> ${formatNumber(infra.buildings_damaged)}</li>`
+        ];
+        sections.push(renderList('Infrastructure Damage', items));
+      }
+
+      if (results.environmental_impact) {
+        const env = results.environmental_impact;
+        const items = [
+          `<li><strong>Impact Score:</strong> ${formatNumber(env.environmental_impact_score)}</li>`,
+          `<li><strong>Ecosystem Area:</strong> ${formatNumber(env.ecosystem_affected_area)} km²</li>`,
+          `<li><strong>Atmospheric Effects:</strong> ${JSON.stringify(env.atmospheric_effects)}</li>`
+        ];
+        sections.push(renderList('Environmental Impact', items));
+      }
+
+      if (results.economic_impact) {
+        const econ = results.economic_impact;
+        const items = [
+          `<li><strong>Total Cost:</strong> $${formatNumber(econ.total_economic_cost)}</li>`,
+          `<li><strong>Recovery Time:</strong> ${formatNumber(econ.recovery_time_years)} years</li>`,
+          `<li><strong>Casualty Cost:</strong> $${formatNumber(econ.casualty_cost)}</li>`,
+          `<li><strong>Injury Cost:</strong> $${formatNumber(econ.injury_cost)}</li>`,
+          `<li><strong>Displacement Cost:</strong> $${formatNumber(econ.displacement_cost)}</li>`,
+          `<li><strong>Infrastructure Cost:</strong> $${formatNumber(econ.infrastructure_cost)}</li>`,
+          `<li><strong>Environmental Cost:</strong> $${formatNumber(econ.environmental_cost)}</li>`
+        ];
+        sections.push(renderList('Economic Impact', items));
+      }
+
+      if (results.damage_assessment) {
+        sections.push(`
+          <div style="margin-bottom:10px;">
+            <h5 style="margin:0 0 6px 0;font-size:13px;">Damage Assessment Summary</h5>
+            <pre style="margin:0;font-size:11px;white-space:pre-wrap;">${JSON.stringify(results.damage_assessment, null, 2)}</pre>
+          </div>
+        `);
+      }
+
+      if (results.ml_enhanced_damage) {
+        sections.push(`
+          <div style="margin-bottom:10px;">
+            <h5 style="margin:0 0 6px 0;font-size:13px;">ML Enhanced Damage</h5>
+            <pre style="margin:0;font-size:11px;white-space:pre-wrap;">${JSON.stringify(results.ml_enhanced_damage, null, 2)}</pre>
+          </div>
+        `);
+      }
+
+      advancedResultsContainer.innerHTML = sections.join('');
+      advancedResultsContainer.style.display = 'block';
+    };
 
     const renderHistoryTable = (history) => {
       const tableBody = document.getElementById('historyTableBody');
@@ -417,30 +807,19 @@
 
     document.getElementById('launchButton').addEventListener('click', async function(e) {
       e.preventDefault();
-      
+
       const launchButton = document.getElementById('launchButton');
       const originalText = launchButton.textContent;
       launchButton.textContent = 'Simulating...';
       launchButton.disabled = true;
 
       try {
-        const asteroidData = {
-          diameter: parseFloat(document.getElementById('asteroid_size').value),
-          mass: parseFloat(document.getElementById('asteroid_mass').value),
-          velocity: parseFloat(document.getElementById('asteroid_speed').value),
-          density: parseFloat(document.getElementById('asteroid_density').value),
-          impact_angle: parseFloat(document.getElementById('impact_angle').value),
-          composition: document.getElementById('composition').value
-        };
+        const asteroidData = getAsteroidFormData();
+        const impactLocation = getImpactLocationFormData();
 
-        const impactLocation = {
-          latitude: parseFloat(document.getElementById('latitude').value),
-          longitude: parseFloat(document.getElementById('longitude').value),
-          elevation: parseFloat(document.getElementById('elevation').value),
-          terrain_type: document.getElementById('terrain_type').value
-        };
-
-        const simulationResult = await api.simulateImpact(asteroidData, impactLocation);
+        const simulationResult = await api.simulateImpact(asteroidData, impactLocation, {
+          useML: document.getElementById('use_ml_enhancer').checked
+        });
 
         console.log('Simulation result:', simulationResult);
 
@@ -454,6 +833,8 @@
             elevation: impactLocation.elevation,
             terrain_type: impactLocation.terrain_type,
             population_density: simulationResult.impact_location?.population_density ?? impactLocation.population_density ?? 0,
+            infrastructure_density: simulationResult.impact_location?.infrastructure_density ?? impactLocation.infrastructure_density ?? 0,
+            water_depth: simulationResult.impact_location?.water_depth ?? impactLocation.water_depth ?? null,
             blast_radius: impactResult.blast_radius ?? DEFAULT_SIMULATION.location.blast_radius,
             crater_diameter: impactResult.crater_diameter ?? DEFAULT_SIMULATION.location.crater_diameter,
             thermal_radius: impactResult.thermal_radius ?? DEFAULT_SIMULATION.location.thermal_radius,
@@ -499,6 +880,15 @@
           document.getElementById('evacuation_radius').value = latestImpactResult.evacuation_radius;
         }
 
+        if (typeof latestSimulation.location.population_density === 'number') {
+          document.getElementById('population_density').value = latestSimulation.location.population_density;
+        }
+        if (typeof latestSimulation.location.infrastructure_density === 'number') {
+          document.getElementById('infrastructure_density').value = latestSimulation.location.infrastructure_density;
+        }
+        const waterDepthValue = latestSimulation.location.water_depth;
+        document.getElementById('water_depth').value = Number.isFinite(waterDepthValue) ? waterDepthValue : '';
+
         window.dispatchEvent(new CustomEvent('impactSettingsChanged', { detail: clone(latestSimulation) }));
 
         if (typeof window.startMeteorSimulation === 'function') {
@@ -523,6 +913,43 @@
         launchButton.disabled = false;
       }
     });
+
+    const advancedCalcButton = document.getElementById('advancedCalcButton');
+    if (advancedCalcButton) {
+      advancedCalcButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+
+        showSettingsPage('advanced');
+
+        const button = event.currentTarget;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Calculating...';
+
+        if (advancedResultsContainer) {
+          advancedResultsContainer.style.display = 'block';
+          advancedResultsContainer.innerHTML = '<p style="margin:0;">Calculating advanced metrics...</p>';
+        }
+
+        try {
+          const asteroidData = getAsteroidFormData();
+          const impactLocation = getImpactLocationFormData();
+          const options = getAdvancedCalculationOptions();
+
+          const results = await api.calculateAdvancedImpact(asteroidData, impactLocation, options);
+          renderAdvancedResults(results);
+        } catch (error) {
+          console.error('Advanced calculation failed:', error);
+          if (advancedResultsContainer) {
+            advancedResultsContainer.innerHTML = `<p style="margin:0;color:#b00020;">Advanced calculation failed: ${error.message}</p>`;
+            advancedResultsContainer.style.display = 'block';
+          }
+        } finally {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      });
+    }
 
     window.getImpactSettings = () => clone(latestSimulation);
 
