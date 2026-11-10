@@ -9,8 +9,6 @@ command-line arguments.
 from __future__ import annotations
 
 import argparse
-import contextlib
-import functools
 import sys
 from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
@@ -56,25 +54,18 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parse_args(argv or sys.argv[1:])
 
-    with contextlib.ExitStack() as stack:
-        # Ensure the working directory is the frontend directory so that
-        # relative asset paths are resolved correctly.
-        stack.enter_context(contextlib.chdir(FRONTEND_DIR))
-
-        handler = functools.partial(FrontendRequestHandler)
-
-        # Allow address reuse to prevent "address already in use" errors when
-        # restarting the server rapidly during development.
-        TCPServer.allow_reuse_address = True
-        with TCPServer((args.host, args.port), handler) as httpd:
-            host, port = httpd.server_address
-            url = f"http://{host if host != '0.0.0.0' else 'localhost'}:{port}"
-            print(f"Serving Astroyd Meteor Madness frontend at {url}")
-            print("Press Ctrl+C to stop.")
-            try:
-                httpd.serve_forever()
-            except KeyboardInterrupt:
-                print("\nStopping server...")
+    # The request handler serves FRONTEND_DIR independently of the working
+    # directory. Allow quick restarts of the development server.
+    TCPServer.allow_reuse_address = True
+    with TCPServer((args.host, args.port), FrontendRequestHandler) as httpd:
+        host, port = httpd.server_address
+        url = f"http://{host if host != '0.0.0.0' else 'localhost'}:{port}"
+        print(f"Serving Astroyd Meteor Madness frontend at {url}")
+        print("Press Ctrl+C to stop.")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\nStopping server...")
     return 0
 
 
