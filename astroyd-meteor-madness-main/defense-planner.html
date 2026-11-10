@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meteor Defense Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0d1117;
+      --panel: rgba(20, 26, 33, 0.95);
+      --accent: #7b1fa2;
+      --accent-light: #ba68c8;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --border: rgba(148, 163, 184, 0.2);
+      --success: #10b981;
+      --warning: #f97316;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, rgba(123, 31, 162, 0.15), transparent 45%),
+                  radial-gradient(circle at bottom, rgba(59, 130, 246, 0.15), transparent 40%),
+                  var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 24px clamp(16px, 4vw, 64px) 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      background: linear-gradient(135deg, rgba(123, 31, 162, 0.25), rgba(15, 23, 42, 0.95));
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+
+    header h1 {
+      margin: 0;
+      font-family: 'Orbitron', 'Roboto', sans-serif;
+      font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2.5rem);
+      letter-spacing: 2px;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      max-width: 620px;
+      line-height: 1.4;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hero-actions button,
+    .hero-actions a {
+      border: none;
+      padding: 12px 18px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 150ms ease, box-shadow 150ms ease;
+      font-size: 0.8rem;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      color: white;
+      box-shadow: 0 10px 25px rgba(123, 31, 162, 0.35);
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(123, 31, 162, 0.45);
+    }
+
+    .ghost-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .ghost-btn:hover {
+      color: var(--text);
+      transform: translateY(-2px);
+    }
+
+    main {
+      flex: 1;
+      padding: 24px clamp(16px, 4vw, 64px) 56px;
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    section {
+      background: var(--panel);
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    section::after {
+      content: "";
+      position: absolute;
+      inset: -20% 40% 40% -20%;
+      background: radial-gradient(circle at top right, rgba(123, 31, 162, 0.18), transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    h2 {
+      font-family: 'Orbitron', 'Roboto', sans-serif;
+      margin: 0;
+      z-index: 1;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+      color: var(--muted);
+      z-index: 1;
+    }
+
+    .level-list,
+    .category-list,
+    .loadout-items,
+    .simulation-results,
+    .leaderboard {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 1;
+    }
+
+    .level-card,
+    .shop-item {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: grid;
+      gap: 8px;
+      transition: border 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .level-card:hover,
+    .shop-item:hover {
+      border-color: var(--accent-light);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 22px rgba(123, 31, 162, 0.15);
+    }
+
+    .level-card.active {
+      border-color: var(--accent-light);
+      box-shadow: 0 12px 22px rgba(123, 31, 162, 0.25);
+    }
+
+    .level-meta,
+    .item-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .tag {
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(123, 31, 162, 0.2);
+      color: var(--accent-light);
+    }
+
+    .shop-category {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .shop-category h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--accent-light);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .resource-summary {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      z-index: 1;
+    }
+
+    .resource-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.7);
+      font-size: 0.85rem;
+    }
+
+    .loadout-items .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 32px 0;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+
+    .start-button {
+      margin-top: auto;
+      align-self: flex-start;
+      background: linear-gradient(135deg, #2563eb, #38bdf8);
+      color: white;
+      padding: 14px 32px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      border: none;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: transform 150ms ease, box-shadow 150ms ease;
+    }
+
+    .start-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .start-button:not(:disabled):hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35);
+    }
+
+    .results-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .result-card {
+      padding: 16px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .result-card strong {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+
+    .result-value {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: white;
+    }
+
+    .leaderboard table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      background: rgba(10, 15, 25, 0.6);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .leaderboard th,
+    .leaderboard td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      vertical-align: middle;
+    }
+
+    .leaderboard thead {
+      background: rgba(123, 31, 162, 0.18);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.75rem;
+    }
+
+    .leaderboard tbody tr:nth-child(odd) {
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .leaderboard tbody tr.player-row {
+      background: rgba(123, 31, 162, 0.16);
+      box-shadow: inset 0 0 0 1px rgba(123, 31, 162, 0.32);
+    }
+
+    .leaderboard tbody tr.empty td {
+      text-align: center;
+      color: var(--muted);
+      padding: 18px;
+      font-style: italic;
+    }
+
+    .muted {
+      color: var(--muted);
+      margin: 4px 0 0;
+      font-size: 0.82rem;
+    }
+
+    footer {
+      padding: 16px clamp(16px, 4vw, 64px) 32px;
+      text-align: center;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      background: rgba(10, 12, 16, 0.9);
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 768px) {
+      header {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .hero-actions {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Meteor Defense Planner</h1>
+      <p>Strategize NASA-backed planetary defense missions. Choose a level, invest in research-driven upgrades, and deploy the ultimate protection before the asteroid strikes.</p>
+    </div>
+    <div class="hero-actions">
+      <button class="primary-btn" id="start-simulation">Run Scenario</button>
+      <a href="index.html" class="ghost-btn">Back to Main Simulation</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="level-selection">
+      <h2>1 · Select a Pre-Made Threat Scenario</h2>
+      <p>Each level is based on curated asteroid impact data. Beat levels to earn mission funding and NASA research breakthroughs.</p>
+      <div class="level-list" id="levelList"></div>
+    </section>
+
+    <section id="shop">
+      <h2>2 · Assemble Your Defense System</h2>
+      <p>Invest in tech upgrades before launch. Spend your mission budget and research points to unlock advanced tools.</p>
+      <div class="resource-summary" id="resourceSummary"></div>
+      <div class="category-list" id="shopCategories"></div>
+    </section>
+
+    <section id="loadout">
+      <h2>3 · Launch Configuration</h2>
+      <p>Review your active defenses. Tune the loadout before you kick off the simulation.</p>
+      <div class="loadout-items" id="selectedLoadout">
+        <div class="empty">No systems selected yet. Choose items from the shop to build your response.</div>
+      </div>
+      <button class="start-button" id="launchScenario" disabled>Start Simulation</button>
+    </section>
+
+    <section id="results">
+      <h2>4 · Simulation Outcome</h2>
+      <p>Run the mission to see the projected damages, mission costs, and leaderboard standing.</p>
+      <div class="simulation-results" id="resultsContainer">
+        <div class="results-grid">
+          <div class="result-card">
+            <strong>Damage Prevented</strong>
+            <span class="result-value" id="damagePrevented">—</span>
+          </div>
+          <div class="result-card">
+            <strong>Mission Cost</strong>
+            <span class="result-value" id="missionCost">—</span>
+          </div>
+          <div class="result-card">
+            <strong>Cost Efficiency</strong>
+            <span class="result-value" id="costEfficiency">—</span>
+          </div>
+          <div class="result-card">
+            <strong>Leaderboard Rank</strong>
+            <span class="result-value" id="leaderboardRank">—</span>
+          </div>
+        </div>
+        <div class="leaderboard">
+          <h3>Global Response Leaderboard</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Commander</th>
+                <th>Score</th>
+                <th>Method</th>
+                <th>Mission</th>
+                <th>Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+          </table>
+          <p id="leaderboardStatus" class="muted">Loading live leaderboard…</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    NASA Space Apps · Meteor Madness Defense Game Prototype · Crafted for rapid mission planning previews.
+  </footer>
+
+  <script>
+    const levels = [
+      {
+        id: 'valles-marineris',
+        name: 'Valles Marineris Strike',
+        difficulty: 'Hard',
+        payout: { credits: 3200, research: 6 },
+        data: '648m carbonaceous asteroid on a Mars-skimming trajectory redirected toward Earth.',
+        baseDamage: 780000,
+        requiredPower: 120,
+        impactLocation: { latitude: 15.4, longitude: -74.6, elevation: 0 },
+        approachVector: { latitude: 9.2, longitude: -94.8, altitude: 520000 }
+      },
+      {
+        id: 'aurora-borealis',
+        name: 'Aurora Borealis Window',
+        difficulty: 'Medium',
+        payout: { credits: 2200, research: 4 },
+        data: '392m iron-rich body entering at a polar inclination with high entry speed.',
+        baseDamage: 520000,
+        requiredPower: 85,
+        impactLocation: { latitude: 69.6, longitude: -96.8, elevation: 0 },
+        approachVector: { latitude: 80.4, longitude: -124.3, altitude: 610000 }
+      },
+      {
+        id: 'pacific-guardian',
+        name: 'Pacific Guardian',
+        difficulty: 'Easy',
+        payout: { credits: 1400, research: 2 },
+        data: '190m stony asteroid projected to impact the northern Pacific shipping lanes.',
+        baseDamage: 260000,
+        requiredPower: 55,
+        impactLocation: { latitude: 24.5, longitude: -151.6, elevation: 0 },
+        approachVector: { latitude: 32.8, longitude: -175.2, altitude: 430000 }
+      }
+    ];
+
+    const categories = [
+      {
+        id: 'lasers',
+        name: 'Orbital Lasers',
+        items: [
+          { id: 'laser-mk1', name: 'Helios Mk I', level: 1, research: 0, cost: 650, power: 28 },
+          { id: 'laser-mk2', name: 'Helios Mk II', level: 2, research: 2, cost: 950, power: 40 },
+          { id: 'laser-array', name: 'Apollo Array', level: 3, research: 4, cost: 1400, power: 60 }
+        ]
+      },
+      {
+        id: 'kinetics',
+        name: 'Kinetic Impactors',
+        items: [
+          { id: 'kinetic-duo', name: 'Atlas Twin-Strike', level: 1, research: 0, cost: 520, power: 20 },
+          { id: 'kinetic-swarm', name: 'Aegis Swarm', level: 2, research: 3, cost: 880, power: 36 },
+          { id: 'kinetic-precursor', name: 'Prometheus Precursor', level: 3, research: 5, cost: 1300, power: 55 }
+        ]
+      },
+      {
+        id: 'craft',
+        name: 'Autonomous Craft',
+        items: [
+          { id: 'craft-scout', name: 'Scout Drones', level: 1, research: 1, cost: 420, power: 12 },
+          { id: 'craft-interceptor', name: 'Interceptor Wing', level: 2, research: 3, cost: 780, power: 26 },
+          { id: 'craft-guardian', name: 'Guardian Fleet', level: 3, research: 6, cost: 1180, power: 44 }
+        ]
+      },
+      {
+        id: 'shields',
+        name: 'Planetary Shields',
+        items: [
+          { id: 'shield-atmo', name: 'Atmospheric Modulators', level: 1, research: 2, cost: 600, power: 18 },
+          { id: 'shield-ion', name: 'Ionospheric Guard', level: 2, research: 4, cost: 960, power: 32 },
+          { id: 'shield-planetary', name: 'Planetary Aegis', level: 3, research: 7, cost: 1500, power: 58 }
+        ]
+      }
+    ];
+
+    const API_BASE_URL = window.API_BASE_URL || 'http://localhost:8000/api/v1';
+    const DEFENSE_PLAN_STORAGE_KEY = 'defensePlanner:lastConfiguration';
+
+    const fallbackLeaderboard = [
+      { commander: 'Dr. Vega', mission: 'Valles Marineris', score: 920000, efficiency: 108, method: 'Kinetic Impactor', outcome: 'Success' },
+      { commander: 'Commander Imani', mission: 'Aurora Borealis', score: 880000, efficiency: 102, method: 'Orbital Lasers', outcome: 'Success' },
+      { commander: 'Captain Singh', mission: 'Pacific Guardian', score: 810000, efficiency: 94, method: 'Autonomous Craft', outcome: 'Partial' },
+      { commander: 'Lt. Alvarez', mission: 'Aurora Borealis', score: 780000, efficiency: 90, method: 'Planetary Shields', outcome: 'Success' }
+    ];
+
+    const leaderboard = [];
+    let currentLeaderboard = [];
+
+    const progressionBase = { credits: 800, research: 1 };
+
+    const state = {
+      credits: 0,
+      research: 0,
+      selectedLevel: null,
+      loadout: new Map(),
+      initialCredits: 0,
+      scenarioComplete: false
+    };
+
+    const levelList = document.getElementById('levelList');
+    const resourceSummary = document.getElementById('resourceSummary');
+    const shopCategories = document.getElementById('shopCategories');
+    const selectedLoadout = document.getElementById('selectedLoadout');
+    const launchButton = document.getElementById('launchScenario');
+    const runScenarioButton = document.getElementById('start-simulation');
+
+    runScenarioButton.disabled = true;
+
+    const damagePreventedEl = document.getElementById('damagePrevented');
+    const missionCostEl = document.getElementById('missionCost');
+    const costEfficiencyEl = document.getElementById('costEfficiency');
+    const leaderboardRankEl = document.getElementById('leaderboardRank');
+    const leaderboardBody = document.getElementById('leaderboardBody');
+    const leaderboardStatus = document.getElementById('leaderboardStatus');
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    function formatCredits(value) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value * 1000);
+    }
+
+    function formatScore(value) {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return '—';
+      }
+      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+    }
+
+    function mergeOutcomeText(entry) {
+      const parts = [];
+      if (entry?.outcome) {
+        parts.push(entry.outcome);
+      }
+      if (Number.isFinite(entry?.efficiency)) {
+        parts.push(`${entry.efficiency}% eff.`);
+      }
+      if (Number.isFinite(entry?.successRate)) {
+        parts.push(`${Math.round(entry.successRate * 100)}% intercept rate`);
+      }
+      if (Number.isFinite(entry?.gamesPlayed)) {
+        parts.push(`${entry.gamesPlayed} runs`);
+      }
+      return parts.length ? parts.join(' · ') : '—';
+    }
+
+    function getComparableScore(entry) {
+      if (!entry || typeof entry !== 'object') {
+        return 0;
+      }
+      if (Number.isFinite(entry.score)) {
+        return entry.score;
+      }
+      if (Number.isFinite(entry.efficiency)) {
+        return entry.efficiency;
+      }
+      return 0;
+    }
+
+    function transformLeaderboardEntry(entry, index = 0) {
+      if (!entry || typeof entry !== 'object') {
+        return null;
+      }
+      const commander = entry.player_name || entry.username || entry.commander || entry.full_name || `Commander ${index + 1}`;
+      const mission = entry.mission || entry.level || entry.level_name || entry.difficulty_level || entry.target || entry.scenario || '—';
+      const methodSource = entry.deflection_method || entry.favorite_method || entry.method || entry.strategy;
+      const method = methodSource || '—';
+      const rawScore = Number.parseFloat(entry.score ?? entry.best_score);
+      const score = Number.isFinite(rawScore) ? rawScore : null;
+      const efficiencySource = entry.efficiency ?? entry.cost_efficiency ?? entry.success_rate;
+      let efficiency = null;
+      if (Number.isFinite(efficiencySource)) {
+        efficiency = Math.round(efficiencySource * (efficiencySource <= 1 ? 100 : 1));
+      }
+      let outcome = entry.outcome
+        || (typeof entry.success === 'boolean' ? (entry.success ? 'Success' : 'Failed') : null)
+        || (typeof entry.success_rate === 'number' ? `${Math.round(entry.success_rate * 100)}% success` : null);
+
+      const gamesPlayed = Number.isFinite(entry.games_played) ? entry.games_played : (Number.isFinite(entry.games) ? entry.games : null);
+      if (gamesPlayed === 0 && !outcome) {
+        outcome = 'Awaiting first run';
+      }
+
+      return {
+        commander,
+        mission,
+        method,
+        score,
+        efficiency,
+        outcome,
+        rank: Number.isFinite(entry.rank) ? entry.rank : null,
+        gamesPlayed,
+        successRate: Number.isFinite(entry.success_rate) ? entry.success_rate : null,
+        raw: entry
+      };
+    }
+
+    function setLeaderboardEntries(entries, { source = 'local', fallbackUsed = false } = {}) {
+      const normalized = entries
+        .filter(Boolean)
+        .map(entry => ({ ...entry }))
+        .sort((a, b) => {
+          const rankA = Number.isFinite(a.rank) ? a.rank : null;
+          const rankB = Number.isFinite(b.rank) ? b.rank : null;
+          if (rankA !== null && rankB !== null) {
+            return rankA - rankB;
+          }
+          if (rankA !== null) return -1;
+          if (rankB !== null) return 1;
+          return getComparableScore(b) - getComparableScore(a);
+        });
+      leaderboard.length = 0;
+      normalized.forEach(entry => leaderboard.push(entry));
+      currentLeaderboard = [...leaderboard];
+      renderLeaderboard();
+      if (leaderboardStatus) {
+        if (!currentLeaderboard.length) {
+          leaderboardStatus.textContent = 'No leaderboard entries yet. Run a scenario to become the first commander!';
+        } else if (fallbackUsed) {
+          leaderboardStatus.textContent = 'Live leaderboard unavailable — showing recent NASA training sims.';
+        } else if (source === 'api') {
+          leaderboardStatus.textContent = 'Live leaderboard synced with registered commanders.';
+        } else {
+          leaderboardStatus.textContent = 'Leaderboard updated.';
+        }
+      }
+    }
+
+    async function loadLeaderboard() {
+      if (!window.fetch) {
+        setLeaderboardEntries(fallbackLeaderboard, { fallbackUsed: true });
+        return;
+      }
+      try {
+        if (leaderboardStatus) {
+          leaderboardStatus.textContent = 'Loading live leaderboard…';
+        }
+        const response = await fetch(`${API_BASE_URL}/simulation/deflection-game/leaderboard`);
+        if (!response.ok) {
+          throw new Error(`Leaderboard request failed with status ${response.status}`);
+        }
+        const payload = await response.json();
+        const entries = Array.isArray(payload)
+          ? payload
+          : (Array.isArray(payload?.leaderboard) ? payload.leaderboard : []);
+        if (!entries.length) {
+          setLeaderboardEntries([], { source: 'api' });
+          return;
+        }
+        const mapped = entries
+          .map((entry, index) => transformLeaderboardEntry(entry, index))
+          .filter(Boolean);
+        setLeaderboardEntries(mapped, { source: 'api' });
+      } catch (error) {
+        console.warn('Unable to load live leaderboard', error);
+        if (!leaderboard.length) {
+          setLeaderboardEntries(fallbackLeaderboard, { fallbackUsed: true });
+        } else if (leaderboardStatus) {
+          leaderboardStatus.textContent = 'Unable to reach live leaderboard — displaying last known data.';
+        }
+      }
+    }
+
+    function buildLoadoutSnapshot() {
+      return Array.from(state.loadout.values()).map(item => ({
+        id: item.id,
+        name: item.name,
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        power: item.power,
+        cost: item.cost,
+        research: item.research
+      }));
+    }
+
+    function buildDefensePlan(level, stats, engagement) {
+      return {
+        timestamp: Date.now(),
+        level: level ? {
+          id: level.id,
+          name: level.name,
+          difficulty: level.difficulty,
+          impactLocation: level.impactLocation || null,
+          approachVector: level.approachVector || null
+        } : null,
+        loadout: buildLoadoutSnapshot(),
+        totals: {
+          power: stats.totalPower,
+          creditsAllocated: state.initialCredits,
+          creditsRemaining: state.credits,
+          creditsSpent: state.initialCredits - state.credits,
+          missionCost: stats.spent,
+          damagePrevented: stats.prevented,
+          efficiency: stats.efficiency,
+          accuracy: stats.accuracy,
+          success: Boolean(stats.success)
+        },
+        engagement: engagement || null
+      };
+    }
+
+    function syncDefensePlan(plan) {
+      if (!plan) {
+        return;
+      }
+      window.__latestDefensePlan = plan;
+      try {
+        localStorage.setItem(DEFENSE_PLAN_STORAGE_KEY, JSON.stringify(plan));
+      } catch (storageError) {
+        console.warn('Failed to persist defense plan for visualization sync', storageError);
+      }
+      window.dispatchEvent(new CustomEvent('defenseStrategyUpdated', {
+        detail: {
+          plan,
+          meta: {
+            source: 'defense-planner',
+            autoFollow: true
+          }
+        }
+      }));
+    }
+
+    function renderLevels() {
+      levelList.innerHTML = '';
+      levels.forEach(level => {
+        const card = document.createElement('button');
+        card.className = 'level-card';
+        card.type = 'button';
+        card.innerHTML = `
+          <div class="tag">${level.difficulty}</div>
+          <strong>${level.name}</strong>
+          <p>${level.data}</p>
+          <div class="level-meta">
+            <span>🛰 Required Power: <strong>${level.requiredPower}</strong></span>
+            <span>💰 Reward: <strong>${formatCredits(level.payout.credits)}</strong></span>
+            <span>🔬 Research: <strong>+${level.payout.research}</strong></span>
+          </div>
+        `;
+
+        if (state.selectedLevel && state.selectedLevel.id === level.id) {
+          card.classList.add('active');
+        }
+
+        card.addEventListener('click', () => selectLevel(level));
+
+        levelList.appendChild(card);
+      });
+    }
+
+    function selectLevel(level) {
+      state.selectedLevel = level;
+      state.credits = progressionBase.credits + level.payout.credits;
+      state.research = progressionBase.research + level.payout.research;
+      state.initialCredits = state.credits;
+      state.loadout.clear();
+      runScenarioButton.disabled = false;
+      Array.from(levelList.children).forEach(child => child.classList.remove('active'));
+      const activeCard = Array.from(levelList.children).find(child => child.textContent.includes(level.name));
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+      markScenarioPending(true);
+      currentLeaderboard = [...leaderboard];
+      renderResources();
+      renderShop();
+      renderLoadout();
+      renderLeaderboard();
+      updateLaunchState();
+    }
+
+    function renderResources() {
+      resourceSummary.innerHTML = '';
+      const creditPill = document.createElement('span');
+      creditPill.className = 'resource-pill';
+      creditPill.textContent = `Mission Budget: ${formatCredits(state.credits)}`;
+
+      const researchPill = document.createElement('span');
+      researchPill.className = 'resource-pill';
+      researchPill.textContent = `NASA Research Points: ${state.research}`;
+
+      const powerPill = document.createElement('span');
+      powerPill.className = 'resource-pill';
+      powerPill.textContent = `Total Defense Power: ${getTotalPower()}`;
+
+      resourceSummary.append(creditPill, researchPill, powerPill);
+    }
+
+    function renderShop() {
+      shopCategories.innerHTML = '';
+      categories.forEach(category => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'shop-category';
+        wrapper.innerHTML = `<h3>${category.name}</h3>`;
+
+        category.items.forEach(item => {
+          const loadoutItem = {
+            ...item,
+            categoryId: category.id,
+            categoryName: category.name
+          };
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'shop-item';
+
+          const unlocked = state.research >= loadoutItem.research;
+          const affordable = state.credits >= loadoutItem.cost;
+          const selected = state.loadout.has(loadoutItem.id);
+
+          button.innerHTML = `
+            <div class="item-header">
+              <strong>${loadoutItem.name}</strong>
+            </div>
+            <div class="item-meta">
+              <span>Level ${loadoutItem.level}</span>
+              <span>Power +${loadoutItem.power}</span>
+              <span>Cost ${formatCredits(loadoutItem.cost)}</span>
+              <span>Research ${loadoutItem.research}</span>
+            </div>
+            <p>${unlocked ? 'Ready for deployment.' : 'Unlock with additional NASA research.'}</p>
+          `;
+
+          if (!unlocked) {
+            button.disabled = true;
+            button.style.opacity = 0.5;
+          } else if (!affordable && !selected) {
+            button.disabled = true;
+            button.style.opacity = 0.6;
+            button.querySelector('p').textContent = 'Insufficient mission budget.';
+          }
+
+          if (selected) {
+            button.classList.add('active');
+            button.querySelector('p').textContent = 'Selected for launch.';
+          }
+
+          button.addEventListener('click', () => toggleItem(loadoutItem));
+          wrapper.appendChild(button);
+        });
+
+        shopCategories.appendChild(wrapper);
+      });
+    }
+
+    function resetResultsDisplay() {
+      damagePreventedEl.textContent = '—';
+      missionCostEl.textContent = '—';
+      costEfficiencyEl.textContent = '—';
+      leaderboardRankEl.textContent = '—';
+    }
+
+    function markScenarioPending(forceReset = false) {
+      if (state.scenarioComplete || forceReset) {
+        state.scenarioComplete = false;
+        runScenarioButton.textContent = 'Run Scenario';
+        launchButton.textContent = 'Start Simulation';
+        resetResultsDisplay();
+      }
+    }
+
+    function toggleItem(item) {
+      if (state.loadout.has(item.id)) {
+        const existing = state.loadout.get(item.id);
+        state.loadout.delete(item.id);
+        state.credits += existing.cost;
+      } else {
+        if (state.credits < item.cost || state.research < item.research) {
+          return;
+        }
+        state.loadout.set(item.id, item);
+        state.credits -= item.cost;
+      }
+      markScenarioPending();
+      renderResources();
+      renderShop();
+      renderLoadout();
+      updateLaunchState();
+    }
+
+    function renderLoadout() {
+      selectedLoadout.innerHTML = '';
+      if (state.loadout.size === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No systems selected yet. Choose items from the shop to build your response.';
+        selectedLoadout.appendChild(empty);
+        return;
+      }
+
+      state.loadout.forEach(item => {
+        const container = document.createElement('div');
+        container.className = 'shop-item';
+        container.innerHTML = `
+          <strong>${item.name}</strong>
+          <div class="item-meta">
+            <span>Category: ${item.categoryName ?? 'Classified'}</span>
+            <span>Power +${item.power}</span>
+            <span>Cost ${formatCredits(item.cost)}</span>
+            <span>Research ${item.research}</span>
+          </div>
+        `;
+        selectedLoadout.appendChild(container);
+      });
+    }
+
+    function getTotalPower() {
+      let power = 0;
+      state.loadout.forEach(item => {
+        power += item.power;
+      });
+      return power;
+    }
+
+    function updateLaunchState() {
+      const hasLevel = Boolean(state.selectedLevel);
+      const powerSufficient = state.selectedLevel ? getTotalPower() >= state.selectedLevel.requiredPower : false;
+      if (!hasLevel) {
+        launchButton.disabled = true;
+        launchButton.textContent = 'Select a Level';
+        return;
+      }
+
+      launchButton.disabled = !(hasLevel && powerSufficient);
+      if (state.scenarioComplete) {
+        launchButton.textContent = 'Simulation Complete';
+      } else {
+        launchButton.textContent = powerSufficient ? 'Start Simulation' : 'Add More Power';
+      }
+    }
+
+    function renderLeaderboard() {
+      leaderboardBody.innerHTML = '';
+      if (!currentLeaderboard.length) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.className = 'empty';
+        const emptyCell = document.createElement('td');
+        emptyCell.colSpan = 6;
+        emptyCell.textContent = 'No leaderboard entries yet. Run a scenario to secure the top rank.';
+        emptyRow.appendChild(emptyCell);
+        leaderboardBody.appendChild(emptyRow);
+        return;
+      }
+
+      currentLeaderboard.forEach((entry, idx) => {
+        const row = document.createElement('tr');
+        if (entry.commander === 'You') {
+          row.classList.add('player-row');
+        }
+        let scoreText = '—';
+        if (Number.isFinite(entry.score)) {
+          scoreText = formatScore(entry.score);
+        } else if (Number.isFinite(entry.efficiency)) {
+          scoreText = `${entry.efficiency}%`;
+        }
+        const outcomeText = mergeOutcomeText(entry);
+        const hasComparableScore = Number.isFinite(entry.score) || Number.isFinite(entry.efficiency);
+        const rankDisplay = Number.isFinite(entry.rank)
+          ? entry.rank
+          : (entry.commander === 'You' ? (idx + 1) : (hasComparableScore ? idx + 1 : '—'));
+        row.innerHTML = `
+          <td>${rankDisplay}</td>
+          <td>${entry.commander}</td>
+          <td>${scoreText}</td>
+          <td>${entry.method ?? '—'}</td>
+          <td>${entry.mission ?? '—'}</td>
+          <td>${outcomeText}</td>
+        `;
+        leaderboardBody.appendChild(row);
+      });
+    }
+
+    function computeEngagement(level, totals) {
+      const impact = level.impactLocation || { latitude: 0, longitude: 0, elevation: 0 };
+      const approach = level.approachVector || {
+        latitude: clamp(impact.latitude + 8, -80, 80),
+        longitude: impact.longitude - 18,
+        altitude: 480000
+      };
+      const interceptBlend = totals.success ? 0.58 : 0.72;
+      const interceptLat = approach.latitude + (impact.latitude - approach.latitude) * interceptBlend;
+      const interceptLon = approach.longitude + (impact.longitude - approach.longitude) * interceptBlend;
+      const interceptAlt = clamp(approach.altitude * 0.68, 160000, 680000);
+      const interceptPoint = {
+        latitude: clamp(interceptLat, -85, 85),
+        longitude: interceptLon,
+        altitude: interceptAlt
+      };
+      const missPoint = {
+        latitude: clamp(interceptPoint.latitude - 2.4, -85, 85),
+        longitude: interceptPoint.longitude + 6,
+        altitude: clamp(interceptPoint.altitude * 0.75, 80000, 420000)
+      };
+      const deflectionPoint = {
+        latitude: clamp(interceptPoint.latitude + 3.2, -85, 85),
+        longitude: interceptPoint.longitude + 4.5,
+        altitude: clamp(interceptPoint.altitude + 190000, 200000, 780000)
+      };
+      const accuracyDisplay = Number.isFinite(totals.accuracy) ? Math.round(totals.accuracy) : null;
+      const summary = totals.success
+        ? `Defense intercept succeeded with${accuracyDisplay !== null ? ` ${accuracyDisplay}%` : ''} accuracy.`
+        : `Defense window missed — accuracy${accuracyDisplay !== null ? ` ${accuracyDisplay}%` : ''} below required 90% threshold.`;
+      return {
+        approachPoint: approach,
+        interceptPoint,
+        missPoint,
+        deflectionPoint,
+        success: totals.success,
+        accuracy: totals.accuracy,
+        summary,
+        outcome: totals.success ? 'intercepted' : 'missed'
+      };
+    }
+
+    function runSimulation() {
+      if (!state.selectedLevel) return;
+      const level = state.selectedLevel;
+      const totalPower = getTotalPower();
+      const powerRatio = totalPower / Math.max(level.requiredPower, 1);
+      const mitigationRatio = Math.min(powerRatio, 1.4);
+      const accuracyBase = clamp(powerRatio * 62, 6, 92);
+      const synergyBonus = clamp(state.loadout.size * 4.5, 0, 18);
+      const randomness = Math.random() * 18 - 6;
+      const accuracy = clamp(Math.round(accuracyBase + synergyBonus + randomness), 0, 100);
+      const success = accuracy >= 90;
+      const prevented = success
+        ? Math.round(level.baseDamage * mitigationRatio * (accuracy / 100))
+        : 0;
+      const creditsSpent = Math.max(0, state.initialCredits - state.credits);
+      const spent = creditsSpent * 1000;
+      const efficiency = spent > 0 ? Math.round((prevented / spent) * 100) : 0;
+
+      damagePreventedEl.textContent = success
+        ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(prevented) + ' lives saved'
+        : 'Defense failed — impact imminent';
+      missionCostEl.textContent = formatCredits(creditsSpent);
+      costEfficiencyEl.textContent = efficiency ? `${efficiency} %` : '—';
+
+      const outcomeBase = !success
+        ? 'Defense Failed'
+        : (efficiency >= 120 ? 'Intercept Success' : (efficiency > 0 ? 'Intercept Partial' : 'Intercept Logged'));
+
+      const simulatedEntry = {
+        commander: 'You',
+        mission: level.name,
+        method: 'Custom Loadout',
+        score: prevented,
+        efficiency,
+        outcome: `${outcomeBase} · Accuracy ${accuracy}%`,
+        gamesPlayed: 1,
+        successRate: success ? 1 : 0,
+        success
+      };
+
+      const baseEntries = leaderboard.filter(entry => entry.commander !== 'You');
+      currentLeaderboard = [...baseEntries, simulatedEntry]
+        .sort((a, b) => getComparableScore(b) - getComparableScore(a));
+
+      renderLeaderboard();
+
+      const simulatedRank = currentLeaderboard.findIndex(entry => entry.commander === 'You');
+      leaderboardRankEl.textContent = simulatedRank >= 0 ? '#' + (simulatedRank + 1) : '—';
+
+      const engagement = computeEngagement(level, { accuracy, success });
+      const defensePlan = buildDefensePlan(level, { prevented, spent, efficiency, totalPower, accuracy, success }, engagement);
+      syncDefensePlan(defensePlan);
+
+      if (leaderboardStatus) {
+        leaderboardStatus.textContent = 'Defense plan synced — your run has been ranked above.';
+      }
+
+      runScenarioButton.textContent = 'Scenario Complete';
+      state.scenarioComplete = true;
+      updateLaunchState();
+    }
+
+    function syncStartButtons() {
+      runScenarioButton.addEventListener('click', () => {
+        if (!state.selectedLevel) {
+          alert('Select a level and configure your defenses first.');
+          return;
+        }
+
+        if (launchButton.disabled && !state.scenarioComplete) {
+          alert('Add enough defense power to meet the mission requirements.');
+          return;
+        }
+
+        launchButton.click();
+      });
+
+      launchButton.addEventListener('click', () => {
+        runSimulation();
+      });
+    }
+
+    renderLevels();
+    renderResources();
+    renderShop();
+    renderLoadout();
+    resetResultsDisplay();
+    renderLeaderboard();
+    loadLeaderboard();
+    updateLaunchState();
+    syncStartButtons();
+  </script>
+</body>
+</html>
